@@ -1,8 +1,17 @@
 import { getStore } from "@netlify/blobs";
 
-// Esta función guarda y lee los datos de la polla en Netlify Blobs.
-// GET  /api/polla        -> devuelve { state, matches }
-// POST /api/polla {state} o {matches} -> guarda lo que reciba
+// Combina predicciones por partido y por jugador, para no pisar lo de otros.
+function mergePredictions(base, incoming) {
+  const out = { ...(base || {}) };
+  for (const matchId of Object.keys(incoming || {})) {
+    out[matchId] = { ...(out[matchId] || {}), ...(incoming[matchId] || {}) };
+  }
+  return out;
+}
+
+// Guarda y lee los datos de la polla en Netlify Blobs.
+// GET  /api/polla -> { state, matches }
+// POST /api/polla {state, matches} -> combina y guarda
 export default async (req) => {
   const store = getStore("polla-mundial");
 
@@ -17,8 +26,22 @@ export default async (req) => {
 
     if (req.method === "POST") {
       const body = await req.json();
-      if (body.state !== undefined) await store.setJSON("state", body.state);
+
+      if (body.state !== undefined) {
+        const prev = (await store.get("state", { type: "json" })) || {};
+        const inc = body.state || {};
+        const merged = {
+          predictions: mergePredictions(prev.predictions, inc.predictions),
+          results: { ...(prev.results || {}), ...(inc.results || {}) },
+          champions: { ...(prev.champions || {}), ...(inc.champions || {}) },
+          real_champion: inc.real_champion !== undefined ? inc.real_champion : (prev.real_champion || ""),
+          players: Array.isArray(inc.players) ? inc.players : (prev.players || null),
+        };
+        await store.setJSON("state", merged);
+      }
+
       if (body.matches !== undefined) await store.setJSON("matches", body.matches);
+
       return Response.json({ ok: true });
     }
 
