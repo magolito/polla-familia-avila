@@ -1,0 +1,9 @@
+{
+  "name": "polla-familia-avila",
+  "version": "1.0.0",
+  "description": "Polla Mundialista 2026 - Familia Avila",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
