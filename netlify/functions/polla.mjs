@@ -30,12 +30,19 @@ export default async (req) => {
       if (body.state !== undefined) {
         const prev = (await store.get("state", { type: "json" })) || {};
         const inc = body.state || {};
+        // La lista de jugadores SOLO se actualiza cuando viene la marca playersEdit:true
+        // (acción explícita del admin). Un guardado normal de apuesta NO la toca,
+        // para que nunca se pierda un jugador recién agregado.
+        let players = prev.players || null;
+        if (body.playersEdit === true && Array.isArray(inc.players)) {
+          players = inc.players;
+        }
         const merged = {
           predictions: mergePredictions(prev.predictions, inc.predictions),
           results: { ...(prev.results || {}), ...(inc.results || {}) },
           champions: { ...(prev.champions || {}), ...(inc.champions || {}) },
           real_champion: inc.real_champion !== undefined ? inc.real_champion : (prev.real_champion || ""),
-          players: Array.isArray(inc.players) ? inc.players : (prev.players || null),
+          players,
         };
         await store.setJSON("state", merged);
       }
