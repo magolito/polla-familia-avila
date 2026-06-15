@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Polla Mundialista 2026 · El Grupo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #070d1e; }
+  #root { min-height: 100vh; }
+  .pm-card{transition:transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease, border-color .2s ease}
+  .pm-card:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,.45);border-color:#4a3a1e}
+  .pm-inp::-webkit-outer-spin-button,.pm-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .pm-inp:focus{outline:none;border-color:#ffcd00;box-shadow:0 0 0 3px rgba(212,160,23,.18)}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  .pm-rise{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+  .pm-shine{background:linear-gradient(100deg,#ffcd00 0%,#ffe65c 25%,#ffcd00 50%,#ffe65c 75%,#ffcd00 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 6s linear infinite}
+  .pm-navbtn:hover{color:#eef4ff}
+  .pm-trophy{display:inline-block;animation:floaty 4s ease-in-out infinite}
+  .pm-leader{position:relative;overflow:hidden}
+  .pm-leader::before{content:'';position:absolute;inset:0;background:radial-gradient(120% 140% at 100% 0%,rgba(212,160,23,.2),transparent 60%);pointer-events:none}
+  @keyframes confettiFall{0%{transform:translateY(-20vh) rotate(0);opacity:1}100%{transform:translateY(105vh) rotate(720deg);opacity:.9}}
+  .pm-confetti{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+  .pm-confetti i{position:absolute;top:0;width:9px;height:14px;border-radius:2px;animation:confettiFall linear forwards}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+  @keyframes savedPop{0%{transform:scale(.7);opacity:0}40%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
+  .pm-saved{display:inline-block;animation:savedPop .3s ease-out}
+  .gate-btn{transition:transform .15s ease, border-color .15s ease, background .15s ease}
+  .gate-btn:hover{transform:translateY(-3px);border-color:#ffcd00;background:#12224a}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+
+// ── Conexión a Netlify Blobs vía la function /api/polla ──
+const API = "/api/polla";
+async function apiGet() {
+  const r = await fetch(API);
+  if (!r.ok) throw new Error("GET falló");
+  return r.json();
+}
+async function apiPost(payload) {
+  const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  if (!r.ok) throw new Error("POST falló");
+  return r.json();
+}
+
+const DEFAULT_PLAYERS = ["Nicole", "Manuel", "Daniela", "Ernesto", "Aura", "Carolina", "Daniel", "Marlene", "Silvia", "Juan Martín"];
+const ADMIN = "Manuel";
+// PIN para entrar como Manuel (admin). Cámbialo por el que quieras.
+const ADMIN_PIN = "2311";
+
+const CHAMPION_PICKS = [
+  "Argentina","Brasil","Colombia","Francia","España","Inglaterra","Alemania","Portugal",
+  "Uruguay","México","EEUU","Países Bajos","Croacia","Bélgica","Japón","Marruecos",
+  "Senegal","Ecuador","Canadá","Catar","Suiza","Escocia","Paraguay","Australia","Turquía",
+  "Curazao","Costa de Marfil","Suecia","Túnez","Egipto","Irán","Nueva Zelanda","Cabo Verde",
+  "Arabia Saudita","Senegal","Irak","Noruega","Argelia","Austria","Jordania","RD Congo",
+  "Uzbekistán","Sudáfrica","Corea del Sur","Chequia","Bosnia","Ghana","Panamá",
+];
+const CHAMPION_PTS = 5;
+// Cierre de la apuesta de campeón: inicio de las eliminatorias (Ronda de 32).
+// 28 jun 2026, 00:00 hora del Este (UTC-4) = 04:00 UTC.
+const CHAMPION_DEADLINE = Date.UTC(2026, 5, 28, 4, 0);
+
+const KO_ROUNDS = ["Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final", "Tercer puesto"];
+const isKO = (g) => KO_ROUNDS.some((r) => r.toLowerCase() === (g || "").toLowerCase());
+
+const FLAGS = {
+  "México":"🇲🇽","Sudáfrica":"🇿🇦","Corea del Sur":"🇰🇷","Chequia":"🇨🇿",
+  "Canadá":"🇨🇦","Bosnia":"🇧🇦","Catar":"🇶🇦","Suiza":"🇨🇭",
+  "Brasil":"🇧🇷","Marruecos":"🇲🇦","Haití":"🇭🇹","Escocia":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "EEUU":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Turquía":"🇹🇷",
+  "Alemania":"🇩🇪","Curazao":"🇨🇼","Costa de Marfil":"🇨🇮","Ecuador":"🇪🇨",
+  "Países Bajos":"🇳🇱","Japón":"🇯🇵","Suecia":"🇸🇪","Túnez":"🇹🇳",
+  "Bélgica":"🇧🇪","Egipto":"🇪🇬","Irán":"🇮🇷","Nueva Zelanda":"🇳🇿",
+  "España":"🇪🇸","Cabo Verde":"🇨🇻","Arabia Saudita":"🇸🇦","Uruguay":"🇺🇾",
+  "Francia":"🇫🇷","Senegal":"🇸🇳","Irak":"🇮🇶","Noruega":"🇳🇴",
+  "Argentina":"🇦🇷","Argelia":"🇩🇿","Austria":"🇦🇹","Jordania":"🇯🇴",
+  "Portugal":"🇵🇹","RD Congo":"🇨🇩","Uzbekistán":"🇺🇿","Colombia":"🇨🇴",
+  "Inglaterra":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croacia":"🇭🇷","Ghana":"🇬🇭","Panamá":"🇵🇦",
+};
+
+function scorePrediction(pred, actual) {
+  if (!pred || actual?.h == null || actual?.a == null) return null;
+  if (pred.h === actual.h && pred.a === actual.a) return 3;
+  const ro = (x) => (x.h > x.a ? 1 : x.h < x.a ? -1 : 0);
+  return ro(pred) === ro(actual) ? 1 : 0;
+}
+
+// FIFA publica el fixture en hora del Este (ET = EDT = UTC-4 en jun-jul).
+const SOURCE_TZ_OFFSET = -4;
+const MESES = { Jun: 5, Jul: 6, Ene: 0, Feb: 1, Mar: 2, Abr: 3, May: 4, Ago: 7, Sep: 8, Oct: 9, Nov: 10, Dic: 11 };
+function matchTimestamp(dateStr) {
+  if (!dateStr) return null;
+  const m = dateStr.match(/(\d{1,2})\s+(\w{3}).*?·\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!m) return null;
+  const day = +m[1], mon = MESES[m[2].charAt(0).toUpperCase() + m[2].slice(1, 3).toLowerCase()];
+  if (mon == null) return null;
+  let hr = +m[3]; const min = +m[4]; const pm = /pm/i.test(m[5]);
+  if (pm && hr !== 12) hr += 12; if (!pm && hr === 12) hr = 0;
+  return Date.UTC(2026, mon, day, hr - SOURCE_TZ_OFFSET, min);
+}
+
+const SEED_MATCHES = [
+  { id: "g1", group: "A", home: "México", away: "Sudáfrica", date: "Jue 11 Jun · 3:00 PM" },
+  { id: "g2", group: "A", home: "Corea del Sur", away: "Chequia", date: "Jue 11 Jun · 10:00 PM" },
+  { id: "g3", group: "B", home: "Canadá", away: "Bosnia", date: "Vie 12 Jun · 3:00 PM" },
+  { id: "g4", group: "D", home: "EEUU", away: "Paraguay", date: "Vie 12 Jun · 9:00 PM" },
+  { id: "g5", group: "B", home: "Catar", away: "Suiza", date: "Sáb 13 Jun · 3:00 PM" },
+  { id: "g6", group: "C", home: "Brasil", away: "Marruecos", date: "Sáb 13 Jun · 6:00 PM" },
+  { id: "g7", group: "C", home: "Haití", away: "Escocia", date: "Sáb 13 Jun · 9:00 PM" },
+  { id: "g8", group: "D", home: "Australia", away: "Turquía", date: "Sáb 13 Jun · 11:00 PM" },
+  { id: "g9", group: "E", home: "Alemania", away: "Curazao", date: "Dom 14 Jun · 12:00 PM" },
+  { id: "g10", group: "F", home: "Países Bajos", away: "Japón", date: "Dom 14 Jun · 3:00 PM" },
+  { id: "g11", group: "E", home: "Costa de Marfil", away: "Ecuador", date: "Dom 14 Jun · 6:00 PM" },
+  { id: "g12", group: "F", home: "Suecia", away: "Túnez", date: "Dom 14 Jun · 9:00 PM" },
+  { id: "g13", group: "H", home: "España", away: "Cabo Verde", date: "Lun 15 Jun · 12:00 PM" },
+  { id: "g14", group: "G", home: "Bélgica", away: "Egipto", date: "Lun 15 Jun · 3:00 PM" },
+  { id: "g15", group: "H", home: "Arabia Saudita", away: "Uruguay", date: "Lun 15 Jun · 6:00 PM" },
+  { id: "g16", group: "G", home: "Irán", away: "Nueva Zelanda", date: "Lun 15 Jun · 9:00 PM" },
+  { id: "g17", group: "I", home: "Francia", away: "Senegal", date: "Mar 16 Jun · 3:00 PM" },
+  { id: "g18", group: "I", home: "Irak", away: "Noruega", date: "Mar 16 Jun · 6:00 PM" },
+  { id: "g19", group: "J", home: "Argentina", away: "Argelia", date: "Mar 16 Jun · 9:00 PM" },
+  { id: "g20", group: "J", home: "Austria", away: "Jordania", date: "Mié 17 Jun · 12:00 AM" },
+  { id: "g21", group: "K", home: "Portugal", away: "RD Congo", date: "Mié 17 Jun · 1:00 PM" },
+  { id: "g22", group: "L", home: "Inglaterra", away: "Croacia", date: "Mié 17 Jun · 4:00 PM" },
+  { id: "g23", group: "L", home: "Ghana", away: "Panamá", date: "Mié 17 Jun · 7:00 PM" },
+  { id: "g24", group: "K", home: "Uzbekistán", away: "Colombia", date: "Mié 17 Jun · 10:00 PM" },
+  { id: "g25", group: "A", home: "Chequia", away: "Sudáfrica", date: "Jue 18 Jun · 12:00 PM" },
+  { id: "g26", group: "B", home: "Suiza", away: "Bosnia", date: "Jue 18 Jun · 3:00 PM" },
+  { id: "g27", group: "B", home: "Canadá", away: "Catar", date: "Jue 18 Jun · 6:00 PM" },
+  { id: "g28", group: "A", home: "México", away: "Corea del Sur", date: "Jue 18 Jun · 9:00 PM" },
+  { id: "g29", group: "D", home: "EEUU", away: "Australia", date: "Vie 19 Jun · 3:00 PM" },
+  { id: "g30", group: "C", home: "Escocia", away: "Marruecos", date: "Vie 19 Jun · 6:00 PM" },
+  { id: "g31", group: "C", home: "Brasil", away: "Haití", date: "Vie 19 Jun · 9:00 PM" },
+  { id: "g32", group: "D", home: "Turquía", away: "Paraguay", date: "Sáb 20 Jun · 12:00 AM" },
+  { id: "g33", group: "F", home: "Países Bajos", away: "Suecia", date: "Sáb 20 Jun · 1:00 PM" },
+  { id: "g34", group: "E", home: "Alemania", away: "Costa de Marfil", date: "Sáb 20 Jun · 4:00 PM" },
+  { id: "g35", group: "E", home: "Ecuador", away: "Curazao", date: "Sáb 20 Jun · 8:00 PM" },
+  { id: "g36", group: "F", home: "Túnez", away: "Japón", date: "Dom 21 Jun · 12:00 AM" },
+  { id: "g37", group: "H", home: "España", away: "Arabia Saudita", date: "Dom 21 Jun · 12:00 PM" },
+  { id: "g38", group: "G", home: "Bélgica", away: "Irán", date: "Dom 21 Jun · 3:00 PM" },
+  { id: "g39", group: "H", home: "Uruguay", away: "Cabo Verde", date: "Dom 21 Jun · 6:00 PM" },
+  { id: "g40", group: "G", home: "Nueva Zelanda", away: "Egipto", date: "Dom 21 Jun · 9:00 PM" },
+  { id: "g41", group: "J", home: "Argentina", away: "Austria", date: "Lun 22 Jun · 1:00 PM" },
+  { id: "g42", group: "I", home: "Francia", away: "Irak", date: "Lun 22 Jun · 5:00 PM" },
+  { id: "g43", group: "I", home: "Noruega", away: "Senegal", date: "Lun 22 Jun · 8:00 PM" },
+  { id: "g44", group: "J", home: "Jordania", away: "Argelia", date: "Lun 22 Jun · 11:00 PM" },
+  { id: "g45", group: "K", home: "Portugal", away: "Uzbekistán", date: "Mar 23 Jun · 1:00 PM" },
+  { id: "g46", group: "L", home: "Inglaterra", away: "Ghana", date: "Mar 23 Jun · 4:00 PM" },
+  { id: "g47", group: "L", home: "Panamá", away: "Croacia", date: "Mar 23 Jun · 7:00 PM" },
+  { id: "g48", group: "K", home: "Colombia", away: "RD Congo", date: "Mar 23 Jun · 10:00 PM" },
+  { id: "g49", group: "B", home: "Suiza", away: "Canadá", date: "Mié 24 Jun · 3:00 PM" },
+  { id: "g50", group: "B", home: "Bosnia", away: "Catar", date: "Mié 24 Jun · 3:00 PM" },
+  { id: "g51", group: "C", home: "Marruecos", away: "Haití", date: "Mié 24 Jun · 6:00 PM" },
+  { id: "g52", group: "C", home: "Escocia", away: "Brasil", date: "Mié 24 Jun · 6:00 PM" },
+  { id: "g53", group: "A", home: "Sudáfrica", away: "Corea del Sur", date: "Mié 24 Jun · 9:00 PM" },
+  { id: "g54", group: "A", home: "Chequia", away: "México", date: "Mié 24 Jun · 9:00 PM" },
+  { id: "g55", group: "E", home: "Curazao", away: "Costa de Marfil", date: "Jue 25 Jun · 5:00 PM" },
+  { id: "g56", group: "E", home: "Ecuador", away: "Alemania", date: "Jue 25 Jun · 5:00 PM" },
+  { id: "g57", group: "F", home: "Túnez", away: "Países Bajos", date: "Jue 25 Jun · 8:00 PM" },
+  { id: "g58", group: "F", home: "Japón", away: "Suecia", date: "Jue 25 Jun · 8:00 PM" },
+  { id: "g59", group: "D", home: "Turquía", away: "EEUU", date: "Jue 25 Jun · 11:00 PM" },
+  { id: "g60", group: "D", home: "Paraguay", away: "Australia", date: "Jue 25 Jun · 11:00 PM" },
+  { id: "g61", group: "I", home: "Noruega", away: "Francia", date: "Vie 26 Jun · 3:00 PM" },
+  { id: "g62", group: "I", home: "Senegal", away: "Irak", date: "Vie 26 Jun · 3:00 PM" },
+  { id: "g63", group: "H", home: "Cabo Verde", away: "Arabia Saudita", date: "Vie 26 Jun · 8:00 PM" },
+  { id: "g64", group: "H", home: "Uruguay", away: "España", date: "Vie 26 Jun · 8:00 PM" },
+  { id: "g65", group: "G", home: "Nueva Zelanda", away: "Bélgica", date: "Vie 26 Jun · 11:00 PM" },
+  { id: "g66", group: "G", home: "Egipto", away: "Irán", date: "Vie 26 Jun · 11:00 PM" },
+  { id: "g67", group: "L", home: "Panamá", away: "Inglaterra", date: "Sáb 27 Jun · 5:00 PM" },
+  { id: "g68", group: "L", home: "Croacia", away: "Ghana", date: "Sáb 27 Jun · 5:00 PM" },
+  { id: "g69", group: "K", home: "Colombia", away: "Portugal", date: "Sáb 27 Jun · 7:30 PM" },
+  { id: "g70", group: "K", home: "RD Congo", away: "Uzbekistán", date: "Sáb 27 Jun · 7:30 PM" },
+  { id: "g71", group: "J", home: "Argelia", away: "Austria", date: "Sáb 27 Jun · 10:00 PM" },
+  { id: "g72", group: "J", home: "Jordania", away: "Argentina", date: "Sáb 27 Jun · 10:00 PM" },
+];
+
+function PollaMundial() {
+  const [players, setPlayers] = useState(DEFAULT_PLAYERS);
+  const PLAYERS = players; // alias para usar igual que antes en todo el componente
+  const [matches, setMatches] = useState(SEED_MATCHES);
+  const [predictions, setPredictions] = useState({});
+  const [results, setResults] = useState({});
+  const [champions, setChampions] = useState({});
+  const [realChampion, setRealChampion] = useState("");
+  const [me, setMe] = useState(() => {
+    try { return localStorage.getItem("polla_me") || ""; } catch { return ""; }
+  });
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState(false);
+  const [askingPin, setAskingPin] = useState(false);
+  const [tab, setTab] = useState("grupos");
+  const [loading, setLoading] = useState(true);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [newM, setNewM] = useState({ group: "Octavos", home: "", away: "", date: "" });
+  const [newPlayer, setNewPlayer] = useState("");
+  const [now, setNow] = useState(Date.now());
+  const [confetti, setConfetti] = useState(false);
+  const [saveErr, setSaveErr] = useState(false);
+  const [draft, setDraft] = useState({});      // borrador local mientras escribe: { matchId: {h,a} }
+  const [editing, setEditing] = useState({});   // partidos en modo edición: { matchId: true }
+  const [justSaved, setJustSaved] = useState({}); // flash "✓ Guardado!" momentáneo: { matchId: true }
+  const [expanded, setExpanded] = useState({});    // partidos con apuestas desplegadas: { matchId: true }
+
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(t); }, []);
+
+  // Refs que SIEMPRE tienen el último valor (React actualiza el estado async,
+  // así que para guardar usamos estos refs, no las variables de estado).
+  const predRef = useRef({}); predRef.current = predictions;
+  const resRef = useRef({}); resRef.current = results;
+  const champRef = useRef({}); champRef.current = champions;
+  const realChampRef = useRef(""); realChampRef.current = realChampion;
+  const matchesRef = useRef(SEED_MATCHES); matchesRef.current = matches;
+  const playersRef = useRef(DEFAULT_PLAYERS); playersRef.current = players;
+  const lastPushRef = useRef(0);
+  const savingRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+
+  const applyState = (st) => {
+    if (!st) return;
+    setPredictions(st.predictions || {});
+    setResults(st.results || {});
+    setChampions(st.champions || {});
+    setRealChampion(st.real_champion || "");
+    if (Array.isArray(st.players) && st.players.length) setPlayers(st.players);
+  };
+
+  // ── Carga inicial ──
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { state, matches: mt } = await apiGet();
+        if (!active) return;
+        applyState(state);
+        if (mt) setMatches(mt);
+      } catch (e) { console.error(e); setSaveErr(true); }
+      setLoading(false);
+    })();
+    return () => { active = false; };
+  }, []);
+
+  // ── Guardado en cola: junta cambios y nunca pierde el último ──
+  // Cada cambio marca "dirty" y dispara un flush. Si ya hay un guardado en curso,
+  // se vuelve a guardar al terminar, usando SIEMPRE el estado más reciente (los refs).
+  const flush = async () => {
+    if (savingRef.current) { dirtyRef.current = true; return; }
+    savingRef.current = true; dirtyRef.current = false;
+    setSaving(true);
+    lastPushRef.current = Date.now();
+    const payload = {
+      state: {
+        predictions: predRef.current,
+        results: resRef.current,
+        champions: champRef.current,
+        real_champion: realChampRef.current,
+        players: playersRef.current,
+      },
+      matches: matchesRef.current,
+    };
+    try { await apiPost(payload); setSaveErr(false); }
+    catch (e) { console.error(e); setSaveErr(true); dirtyRef.current = true; }
+    savingRef.current = false;
+    lastPushRef.current = Date.now();
+    if (dirtyRef.current) { setTimeout(flush, 200); } // hubo más cambios mientras guardaba
+    else setSaving(false);
+  };
+  const queueSave = () => { dirtyRef.current = true; setTimeout(flush, 150); };
+
+  // ── Polling: trae cambios de otros, pero NUNCA mientras yo estoy editando/guardando ──
+  useEffect(() => {
+    const t = setInterval(async () => {
+      if (savingRef.current || dirtyRef.current) return;        // estoy guardando
+      if (Date.now() - lastPushRef.current < 8000) return;      // acabo de guardar, espera
+      try {
+        const { state, matches: mt } = await apiGet();
+        applyState(state);
+        if (mt) setMatches(mt);
+        setSaveErr(false);
+      } catch (e) { /* reintenta luego */ }
+    }, 6000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Escribir en el borrador local (no guarda todavía)
+  const setDraftScore = (matchId, side, val) => {
+    const v = val === "" ? null : Math.max(0, parseInt(val) || 0);
+    const base = draft[matchId] || predictions[matchId]?.[me] || {};
+    setDraft({ ...draft, [matchId]: { ...base, [side]: v } });
+  };
+  // Guardar la predicción de un partido (botón Guardar)
+  const savePred = (matchId) => {
+    const m = matches.find((x) => x.id === matchId);
+    // Doble verificación: si el partido ya empezó justo ahora, no deja guardar
+    if (m && hasStarted(m, true)) { setNow(Date.now()); return; }
+    const d = draft[matchId] || predictions[matchId]?.[me] || {};
+    if (d.h == null || d.a == null) return; // necesita ambos marcadores
+    const next = { ...predictions, [matchId]: { ...(predictions[matchId] || {}), [me]: { h: d.h, a: d.a } } };
+    predRef.current = next; setPredictions(next);
+    const nd = { ...draft }; delete nd[matchId]; setDraft(nd);
+    const ne = { ...editing }; delete ne[matchId]; setEditing(ne);
+    queueSave();
+    // flash "✓ Guardado!" por ~1.4s
+    setJustSaved((js) => ({ ...js, [matchId]: true }));
+    setTimeout(() => setJustSaved((js) => { const n = { ...js }; delete n[matchId]; return n; }), 1400);
+  };
+  // Guardado directo (usado en el bracket de eliminatorias)
+  const setPred = (matchId, side, val) => {
+    const v = val === "" ? null : Math.max(0, parseInt(val) || 0);
+    const cur = predictions[matchId]?.[me] || {};
+    const next = { ...predictions, [matchId]: { ...(predictions[matchId] || {}), [me]: { ...cur, [side]: v } } };
+    predRef.current = next; setPredictions(next); queueSave();
+  };
+  // Entrar en modo edición (botón Editar)
+  const editPred = (matchId) => {
+    setDraft({ ...draft, [matchId]: { ...(predictions[matchId]?.[me] || {}) } });
+    setEditing({ ...editing, [matchId]: true });
+  };
+  const setResult = (matchId, side, val) => {
+    const v = val === "" ? null : Math.max(0, parseInt(val) || 0);
+    const cur = results[matchId] || {};
+    const next = { ...results, [matchId]: { ...cur, [side]: v } };
+    resRef.current = next; setResults(next); queueSave();
+  };
+  const saveChampions = (c) => {
+    if (Date.now() >= CHAMPION_DEADLINE || realChampion) return; // cerrado: no se puede cambiar
+    champRef.current = c; setChampions(c); queueSave();
+  };
+  const saveRealChampion = (v) => { realChampRef.current = v; setRealChampion(v); queueSave(); };
+  const saveMatches = (m) => { matchesRef.current = m; setMatches(m); queueSave(); };
+  // Guardado directo de la lista de jugadores (acción del admin).
+  // Manda la marca playersEdit para que el servidor sí actualice la lista.
+  const pushPlayers = async (list) => {
+    lastPushRef.current = Date.now();
+    setSaving(true);
+    try {
+      await apiPost({
+        playersEdit: true,
+        state: {
+          predictions: predRef.current, results: resRef.current,
+          champions: champRef.current, real_champion: realChampRef.current,
+          players: list,
+        },
+      });
+      setSaveErr(false);
+    } catch (e) { console.error(e); setSaveErr(true); }
+    lastPushRef.current = Date.now();
+    setSaving(false);
+  };
+  const addPlayer = (name) => {
+    const n = (name || "").trim();
+    if (!n || players.includes(n)) return;
+    const next = [...players, n];
+    playersRef.current = next; setPlayers(next); pushPlayers(next);
+  };
+  const removePlayer = (name) => {
+    if (name === ADMIN) return; // no se puede quitar al admin
+    const next = players.filter((p) => p !== name);
+    playersRef.current = next; setPlayers(next); pushPlayers(next);
+  };
+
+  const standings = useMemo(() => {
+    const totals = Object.fromEntries(PLAYERS.map((p) => [p, { pts: 0, exact: 0, hits: 0, champ: false, streak: 0, bestStreak: 0 }]));
+    const closedOrdered = matches
+      .filter((m) => { const r = results[m.id]; return r && r.h != null && r.a != null; })
+      .sort((a, b) => (matchTimestamp(a.date) || 0) - (matchTimestamp(b.date) || 0));
+    PLAYERS.forEach((p) => {
+      let run = 0;
+      closedOrdered.forEach((m) => {
+        const s = scorePrediction(predictions[m.id]?.[p], results[m.id]);
+        if (s != null) {
+          totals[p].pts += s;
+          if (s === 3) totals[p].exact++;
+          if (s > 0) { totals[p].hits++; run++; if (run > totals[p].bestStreak) totals[p].bestStreak = run; }
+          else run = 0;
+        }
+      });
+      totals[p].streak = run;
+    });
+    if (realChampion) PLAYERS.forEach((p) => { if (champions[p] === realChampion) { totals[p].pts += CHAMPION_PTS; totals[p].champ = true; } });
+    const arr = Object.entries(totals).map(([n, v]) => ({ name: n, ...v }));
+    const maxExact = Math.max(0, ...arr.map((r) => r.exact));
+    const maxStreak = Math.max(0, ...arr.map((r) => r.bestStreak));
+    arr.forEach((r) => {
+      r.badges = [];
+      if (maxExact > 0 && r.exact === maxExact) r.badges.push({ e: "🎯", t: "Rey del marcador exacto" });
+      if (r.streak >= 3) r.badges.push({ e: "🔥", t: `Racha de ${r.streak}` });
+      if (maxStreak >= 3 && r.bestStreak === maxStreak) r.badges.push({ e: "⚡", t: `Mejor racha (${r.bestStreak})` });
+      if (r.champ) r.badges.push({ e: "🏆", t: "Acertó el campeón" });
+    });
+    return arr.sort((a, b) => b.pts - a.pts || b.exact - a.exact);
+  }, [matches, predictions, results, champions, realChampion]);
+
+  const prevExactRef = useRef(null);
+  useEffect(() => {
+    const mine = standings.find((r) => r.name === me);
+    const cur = mine ? mine.exact : 0;
+    if (prevExactRef.current != null && cur > prevExactRef.current) {
+      setConfetti(true);
+      const t = setTimeout(() => setConfetti(false), 3500);
+      prevExactRef.current = cur; return () => clearTimeout(t);
+    }
+    prevExactRef.current = cur;
+  }, [standings, me]);
+
+  const grouped = useMemo(() => { const g = {}; matches.forEach((m) => { (g[m.group] ||= []).push(m); }); return g; }, [matches]);
+  const bracket = useMemo(() => {
+    const byRound = {};
+    matches.forEach((m) => { if (isKO(m.group)) (byRound[m.group] ||= []).push(m); });
+    return KO_ROUNDS.filter((r) => byRound[r] && byRound[r].length).map((r) => ({ round: r, games: byRound[r] }));
+  }, [matches]);
+
+  const flag = (t) => FLAGS[t] || "⚽";
+
+  // Elegir identidad. Si es Manuel (admin), abre el PIN. Los demás entran directo.
+  const pickIdentity = (name) => {
+    if (name === ADMIN) { setAskingPin(true); setPinInput(""); setPinError(false); return; }
+    try { localStorage.setItem("polla_me", name); } catch {}
+    setMe(name);
+  };
+  const submitPin = () => {
+    if (pinInput !== ADMIN_PIN) { setPinError(true); return; }
+    try { localStorage.setItem("polla_me", ADMIN); } catch {}
+    setMe(ADMIN); setAskingPin(false); setPinError(false); setPinInput("");
+  };
+  const logout = () => {
+    try { localStorage.removeItem("polla_me"); } catch {}
+    setMe(""); setAdminOpen(false); setPinInput(""); setPinError(false); setAskingPin(false);
+  };
+  const isClosed = (mId) => { const r = results[mId]; return r && r.h != null && r.a != null; };
+  const hasStarted = (m, realtime) => { const ts = matchTimestamp(m.date); return ts != null && (realtime ? Date.now() : now) >= ts; };
+  const isLocked = (m) => isClosed(m.id) || hasStarted(m);
+  const betCount = (mId) => PLAYERS.filter((p) => { const x = predictions[mId]?.[p]; return x && x.h != null && x.a != null; }).length;
+
+  const addMatch = () => {
+    if (!newM.home || !newM.away) return;
+    saveMatches([...matches, { id: "k" + Date.now(), ...newM }]);
+    setNewM({ group: newM.group, home: "", away: "", date: "" });
+  };
+  const delMatch = (id) => saveMatches(matches.filter((m) => m.id !== id));
+
+  if (loading) return <div style={{ ...S.wrap, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", color: "#ffcd00" }}>Cargando la polla…</div>;
+
+  if (!me) {
+    const initial = (n) => n.charAt(0);
+    const avatarColors = { Nicole: "#ff5c8a", Manuel: "#ffcd00", Daniela: "#22c55e", Ernesto: "#308ff6", Aura: "#b15cff", Carolina: "#ff8c42", Daniel: "#00d4c8" };
+    return (
+      <div style={S.gateScreen}>
+        <div style={S.gateGlow} />
+        <div style={S.gateInner} className="pm-rise">
+          <svg viewBox="0 0 120 150" width="74" height="92" className="pm-trophy" style={{ filter: "drop-shadow(0 10px 24px rgba(255,205,0,.4))" }}>
+            <defs><linearGradient id="gc" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#ffe65c"/><stop offset="50%" stopColor="#ffcd00"/><stop offset="100%" stopColor="#b38f00"/></linearGradient></defs>
+            <path d="M35 20 H85 V42 Q85 70 60 78 Q35 70 35 42 Z" fill="url(#gc)" stroke="#806600" strokeWidth="1.5"/>
+            <path d="M35 26 Q18 28 20 44 Q22 56 35 54" fill="none" stroke="url(#gc)" strokeWidth="5"/>
+            <path d="M85 26 Q102 28 100 44 Q98 56 85 54" fill="none" stroke="url(#gc)" strokeWidth="5"/>
+            <rect x="55" y="78" width="10" height="16" fill="url(#gc)"/>
+            <path d="M44 94 H76 L72 104 H48 Z" fill="url(#gc)" stroke="#806600" strokeWidth="1"/>
+            <rect x="42" y="104" width="36" height="8" rx="2" fill="#b38f00"/>
+            <rect x="38" y="112" width="44" height="9" rx="2" fill="url(#gc)" stroke="#806600" strokeWidth="1"/>
+          </svg>
+          <div style={S.gateKicker}>POLLA MUNDIALISTA · 2026</div>
+          <h1 style={{ ...S.title, fontSize: "clamp(34px,9vw,56px)", textAlign: "center", margin: "2px 0 0" }}>FAMILIA AVILA<span className="pm-shine">.</span></h1>
+
+          {!askingPin ? (
+            <>
+              <p style={S.gateAsk}>¿Quién eres?</p>
+              <div style={S.gateGrid}>
+                {PLAYERS.map((p) => (
+                  <button key={p} onClick={() => pickIdentity(p)} className="pm-card gate-btn" style={S.gateBtn}>
+                    <span style={{ ...S.gateAvatar, background: avatarColors[p] || "#ffcd00" }}>{initial(p)}</span>
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>{p}</span>
+                    {p === ADMIN && <span style={S.gateLock}>🔒 admin</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div style={S.pinPanel} className="pm-rise">
+              <span style={{ ...S.gateAvatar, background: "#ffcd00", width: 56, height: 56, fontSize: 24 }}>M</span>
+              <div style={{ fontWeight: 700, fontSize: 18, marginTop: 10 }}>Hola Manuel 👋</div>
+              <div style={{ fontSize: 13, opacity: .7, marginBottom: 14 }}>Escribe tu PIN de admin para entrar</div>
+              <input autoFocus type="password" inputMode="numeric" value={pinInput}
+                onChange={(e) => { setPinInput(e.target.value); setPinError(false); }}
+                onKeyDown={(e) => e.key === "Enter" && submitPin()}
+                placeholder="• • • •" style={{ ...S.gatePinInp, ...(pinError ? { borderColor: "#ec5a5a", animation: "shake .3s" } : {}) }} />
+              {pinError && <span style={{ fontSize: 12, color: "#ec5a5a", fontWeight: 700, marginTop: 8 }}>PIN incorrecto, intenta de nuevo</span>}
+              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                <button onClick={() => { setAskingPin(false); setPinError(false); setPinInput(""); }} style={S.pinBack}>← Volver</button>
+                <button onClick={submitPin} style={S.pinEnter}>Entrar</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={S.wrap}>
+      {confetti && (
+        <div className="pm-confetti">
+          {Array.from({ length: 80 }).map((_, i) => {
+            const colors = ["#ffcd00", "#ffe65c", "#01bf50", "#308ff6", "#ec0000", "#ffffff"];
+            return <i key={i} style={{ left: `${Math.random() * 100}%`, background: colors[i % colors.length], animationDuration: `${1.8 + Math.random() * 1.6}s`, animationDelay: `${Math.random() * 0.5}s` }} />;
+          })}
+        </div>
+      )}
+
+      <header style={S.header}>
+        <div>
+          <div style={S.kicker}><span className="pm-trophy" style={{ marginRight: 8 }}>🏆</span>POLLA MUNDIALISTA · 2026</div>
+          <h1 style={S.title}>FAMILIA AVILA<span className="pm-shine">.</span></h1>
+        </div>
+        <div style={S.meBox}>
+          <span style={{ fontSize: 12, opacity: .6, textTransform: "uppercase", letterSpacing: 1 }}>Soy</span>
+          <div style={S.meFixed}>
+            <span style={{ fontWeight: 700, fontSize: 16 }}>{me}{me === ADMIN && " ⚙"}</span>
+            <button onClick={logout} style={S.changeBtn}>cambiar</button>
+          </div>
+          <div style={S.saveStatus}>{saving ? "💾 guardando…" : "✓ guardado"}</div>
+        </div>
+      </header>
+
+      {saveErr && <div style={S.errBar}>⚠️ Hubo un problema guardando. Revisa tu conexión. Tus datos podrían no haberse guardado.</div>}
+
+      <nav style={S.nav}>
+        {[["grupos", "Grupos"], ["apostar", "Apostar"], ["campeon", "Campeón 🏆"], ["bracket", "Eliminatorias"], ["tabla", "Tabla de posiciones"]].map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} className="pm-navbtn" style={{ ...S.navBtn, ...(tab === k ? S.navBtnActive : {}) }}>{l}</button>
+        ))}
+      </nav>
+
+      {tab === "grupos" && (
+        <div className="pm-rise">
+          <p style={S.hint}>Los <b>12 grupos</b> del Mundial 2026. Pasan los <b>2 primeros</b> de cada grupo más los <b>8 mejores terceros</b>.</p>
+          <div style={S.mapGrid}>
+            {Object.entries(grouped).filter(([grp]) => !isKO(grp)).map(([grp, ms]) => {
+              const teams = [...new Set(ms.flatMap((m) => [m.home, m.away]))];
+              const isCol = teams.includes("Colombia");
+              return (
+                <div key={grp} style={{ ...S.mapNode, ...(isCol ? { borderColor: "#ffcd00" } : {}) }}>
+                  <div style={S.mapNodeTitle}>Grupo {grp}</div>
+                  {teams.map((t) => <div key={t} style={S.groupTeam}><span style={{ fontSize: 18 }}>{flag(t)}</span><span style={t === "Colombia" ? { color: "#ffcd00", fontWeight: 700 } : {}}>{t}</span></div>)}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ ...S.dateLabel, marginTop: 32 }}>¿Cómo funciona el Mundial?</div>
+          <div style={S.pathList}>
+            {[
+              { t: "Fase de grupos", d: "48 → 32", x: "12 grupos de 4. Pasan los 2 primeros + 8 mejores terceros", date: "11–27 jun", emoji: "🌎" },
+              { t: "Ronda de 32", d: "32 → 16", x: "Arranca la eliminación directa", date: "28 jun – 3 jul", emoji: "⚔️" },
+              { t: "Octavos", d: "16 → 8", x: "Octavos de final", date: "4–7 jul", emoji: "🔥" },
+              { t: "Cuartos", d: "8 → 4", x: "Cuartos de final", date: "9–11 jul", emoji: "💪" },
+              { t: "Semifinal", d: "4 → 2", x: "Los 4 mejores del mundo", date: "14–15 jul", emoji: "🌟" },
+              { t: "Final", d: "2 → 1", x: "El campeón se decide en Nueva York", date: "19 jul", emoji: "🏆" },
+            ].map((s) => (
+              <div key={s.t} style={S.pathStep}>
+                <div style={S.pathNum}>{s.emoji}</div>
+                <div style={{ flex: 1 }}><div style={S.pathTitle}>{s.t} <span style={S.pathCount}>{s.d}</span></div><div style={S.pathDesc}>{s.x}</div></div>
+                <div style={S.pathDate}>{s.date}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ ...S.dateLabel, marginTop: 32 }}>📋 Reglas de la polla</div>
+          <div style={S.rulesGrid}>
+            <div style={S.ruleCard}>
+              <div style={S.rulePts}>3<span style={S.rulePtsLbl}>pts</span></div>
+              <div style={{ flex: 1 }}><div style={S.ruleTitle}>Marcador exacto</div><div style={S.ruleDesc}>Le atinas al resultado completo. Predijiste 2-1 y quedó 2-1.</div></div>
+            </div>
+            <div style={S.ruleCard}>
+              <div style={S.rulePts}>1<span style={S.rulePtsLbl}>pt</span></div>
+              <div style={{ flex: 1 }}><div style={S.ruleTitle}>Acertar el resultado</div><div style={S.ruleDesc}>Aciertas quién gana, pierde o si empatan, pero no el marcador. Predijiste 2-1 y quedó 3-0: gana el mismo, +1.</div></div>
+            </div>
+            <div style={S.ruleCard}>
+              <div style={S.rulePts}>0<span style={S.rulePtsLbl}>pts</span></div>
+              <div style={{ flex: 1 }}><div style={S.ruleTitle}>Fallaste</div><div style={S.ruleDesc}>Si predijiste que ganaba uno y empató o ganó el otro, no sumas.</div></div>
+            </div>
+            <div style={{ ...S.ruleCard, borderLeftColor: "#22c55e" }}>
+              <div style={{ ...S.rulePts, color: "#22c55e" }}>5<span style={S.rulePtsLbl}>pts</span></div>
+              <div style={{ flex: 1 }}><div style={S.ruleTitle}>Campeón del mundo 🏆</div><div style={S.ruleDesc}>Eliges tu campeón en la pestaña Campeón. Si le atinas, +5 al final del torneo.</div></div>
+            </div>
+          </div>
+          <div style={S.rulesNote}>
+            🔒 Cada quien apuesta en secreto: las predicciones de los demás se revelan solo cuando arranca el partido. Tu apuesta se cierra sola al pitazo inicial.
+          </div>
+        </div>
+      )}
+
+      {tab === "apostar" && (
+        <div className="pm-rise">
+          <p style={S.hint}>Predice el marcador. <b style={{ color: "#ffcd00" }}>3 pts</b> exacto, <b style={{ color: "#ffcd00" }}>1 pt</b> por acertar quién gana. 🕐 Horas en <b>tu hora local</b>. La apuesta se cierra para todos al arrancar el partido y ahí se revelan todas.</p>
+          {Object.entries(grouped).filter(([grp]) => !isKO(grp)).map(([grp, ms]) => (
+            <div key={grp} style={{ marginBottom: 22 }}>
+              <div style={S.dateLabel}>Grupo {grp}</div>
+              {ms.map((m) => {
+                const pr = predictions[m.id]?.[me] || {};
+                const res = results[m.id] || {};
+                const closed = res.h != null && res.a != null;
+                const locked = isLocked(m), started = hasStarted(m);
+                const s = scorePrediction(pr, res);
+                const count = betCount(m.id);
+                const wH = closed && res.h > res.a, wA = closed && res.a > res.h;
+                const kick = matchTimestamp(m.date);
+                const dd = kick != null ? new Date(kick).toLocaleString("es", { day: "numeric", month: "short" }) : "";
+                const hh = kick != null ? new Date(kick).toLocaleString("es", { hour: "numeric", minute: "2-digit" }) : "";
+                const saved = pr.h != null && pr.a != null;        // ya tengo predicción guardada
+                const isEditing = !!editing[m.id] || (!saved && !locked); // edito si: di click en editar, o aún no he guardado
+                const d = draft[m.id] || (isEditing ? pr : {});    // valores a mostrar en los inputs
+                const draftComplete = (draft[m.id] || pr).h != null && (draft[m.id] || pr).a != null;
+                return (
+                  <div key={m.id} style={{ marginBottom: 5 }}>
+                    <div className="pm-card" style={S.row}>
+                      <div style={S.rowMeta}><span style={S.rowTime}>{dd}</span><span style={{ ...S.rowTime, opacity: .4 }}>{hh}</span></div>
+                      <div style={{ ...S.rowTeam, ...(wH ? S.bracketWin : {}) }}><span style={S.rowFlag}>{flag(m.home)}</span><span style={S.rowName}>{m.home}</span></div>
+                      <input className="pm-inp" type="number" min="0" value={isEditing ? (d.h ?? "") : (pr.h ?? "")} onChange={(e) => setDraftScore(m.id, "h", e.target.value)} style={{ ...S.rowInp, ...(saved && !isEditing ? S.rowInpSaved : {}) }} disabled={locked || !isEditing} />
+                      <span style={S.rowColon}>:</span>
+                      <input className="pm-inp" type="number" min="0" value={isEditing ? (d.a ?? "") : (pr.a ?? "")} onChange={(e) => setDraftScore(m.id, "a", e.target.value)} style={{ ...S.rowInp, ...(saved && !isEditing ? S.rowInpSaved : {}) }} disabled={locked || !isEditing} />
+                      <div style={{ ...S.rowTeam, justifyContent: "flex-end", textAlign: "right", ...(wA ? S.bracketWin : {}) }}><span style={S.rowName}>{m.away}</span><span style={S.rowFlag}>{flag(m.away)}</span></div>
+                      <div style={S.rowAction}>
+                        {locked ? (
+                          closed ? <span style={{ color: s === 3 ? "#22c55e" : s === 1 ? "#ffcd00" : "#a85", fontWeight: 700, fontSize: 10.5 }}>+{s} · {res.h}-{res.a}</span>
+                            : <span style={{ color: "#a85", fontWeight: 700, fontSize: 10 }}>⏱ en juego</span>
+                        ) : justSaved[m.id] ? (
+                          <span className="pm-saved" style={S.savedFlash}>✓ ¡Guardado!</span>
+                        ) : isEditing ? (
+                          <button onClick={() => savePred(m.id)} disabled={!draftComplete} style={{ ...S.saveBtn, ...(draftComplete ? {} : S.saveBtnOff) }}>Guardar</button>
+                        ) : (
+                          <button onClick={() => editPred(m.id)} style={S.editBtn}>✓ Editar</button>
+                        )}
+                      </div>
+                    </div>
+                    {locked && (
+                      <div style={{ marginTop: 4 }}>
+                        <button onClick={() => setExpanded((x) => ({ ...x, [m.id]: !x[m.id] }))} style={S.revealToggle}>
+                          {expanded[m.id] ? "▲ Ocultar apuestas" : `👥 Ver apuestas (${betCount(m.id)})`}
+                        </button>
+                        {expanded[m.id] && (
+                          <div style={S.reveal}>
+                            {PLAYERS.map((p) => {
+                              const pp = predictions[m.id]?.[p]; const has = pp && pp.h != null && pp.a != null; const ps = scorePrediction(pp, res);
+                              return <div key={p} style={{ ...S.revealItem, ...(p === me ? { borderColor: "#ffcd00" } : {}) }}><span style={{ opacity: .8 }}>{p}</span><span style={{ fontWeight: 700 }}>{has ? `${pp.h}-${pp.a}` : "—"}</span>{has && closed && <span style={{ fontSize: 10, color: ps === 3 ? "#22c55e" : ps === 1 ? "#ffcd00" : "#a85", fontWeight: 700 }}>+{ps}</span>}</div>;
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "campeon" && (() => {
+        const champClosed = !!realChampion || now >= CHAMPION_DEADLINE;
+        return (
+        <div className="pm-rise">
+          <div style={S.champHero}>
+            <div style={S.champGlow} />
+            <svg viewBox="0 0 120 150" width="92" height="115" className="pm-trophy" style={{ position: "relative", filter: "drop-shadow(0 10px 24px rgba(212,160,23,.45))" }}>
+              <defs><linearGradient id="goldCup" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#ffe65c"/><stop offset="45%" stopColor="#ffcd00"/><stop offset="100%" stopColor="#cc9e00"/></linearGradient></defs>
+              <path d="M35 20 H85 V42 Q85 70 60 78 Q35 70 35 42 Z" fill="url(#goldCup)" stroke="#b38f00" strokeWidth="1.5"/>
+              <path d="M35 26 Q18 28 20 44 Q22 56 35 54" fill="none" stroke="url(#goldCup)" strokeWidth="5"/>
+              <path d="M85 26 Q102 28 100 44 Q98 56 85 54" fill="none" stroke="url(#goldCup)" strokeWidth="5"/>
+              <rect x="55" y="78" width="10" height="16" fill="url(#goldCup)"/>
+              <path d="M44 94 H76 L72 104 H48 Z" fill="url(#goldCup)" stroke="#b38f00" strokeWidth="1"/>
+              <rect x="42" y="104" width="36" height="8" rx="2" fill="#cc9e00"/>
+              <rect x="38" y="112" width="44" height="9" rx="2" fill="url(#goldCup)" stroke="#b38f00" strokeWidth="1"/>
+            </svg>
+            <div className="pm-shine" style={{ ...S.bracketRoundLabel, fontSize: 26, marginTop: 10, marginBottom: 2 }}>¿Quién levanta la copa?</div>
+            <div style={{ fontSize: 13, opacity: .7, position: "relative" }}>Elige tu campeón del mundo · vale <b style={{ color: "#ffcd00" }}>{CHAMPION_PTS} pts</b> extra 🔥</div>
+          </div>
+          <div className="pm-card pm-leader" style={S.champPickCard}>
+            {champions[me] ? <div style={S.champBig}><span style={{ fontSize: 64, display: "block" }}>{flag(champions[me])}</span><div className="pm-shine" style={{ fontFamily: "'Anton',sans-serif", fontSize: 32, marginTop: 4 }}>{champions[me]}</div><div style={{ fontSize: 12, opacity: .6, marginTop: 4 }}>tu elección de {me}</div></div>
+              : <div style={{ fontSize: 15, opacity: .7, padding: "8px 0 14px" }}>👇 Toca abajo y elige tu campeón, {me}</div>}
+            <select value={champions[me] || ""} onChange={(e) => saveChampions({ ...champions, [me]: e.target.value })} style={S.champSelect} disabled={champClosed}>
+              <option value="">— Elige tu campeón —</option>
+              {[...new Set(CHAMPION_PICKS)].map((c) => <option key={c} value={c}>{flag(c)} {c}</option>)}
+            </select>
+            {champClosed
+              ? <div style={{ fontSize: 12, opacity: .7, marginTop: 10 }}>🔒 Las apuestas de campeón están cerradas{realChampion ? "" : " (cerraron el 28 de junio, al empezar las eliminatorias)"}.</div>
+              : <div style={{ fontSize: 12, opacity: .6, marginTop: 10 }}>⏳ Puedes elegir o cambiar tu campeón hasta el <b style={{ color: "#ffcd00" }}>28 de junio</b> (inicio de eliminatorias).</div>}
+          </div>
+          <div style={S.groupLabel}>Apuestas del grupo</div>
+          <div style={S.champGrid}>
+            {PLAYERS.map((p) => (
+              <div key={p} className="pm-card" style={{ ...S.champCell, ...(realChampion && champions[p] === realChampion ? { borderColor: "#ffcd00", background: "linear-gradient(100deg,#0a1a3a,#0e1a33)" } : {}) }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{p}</span>
+                <span style={{ fontSize: 14 }}>{champions[p] ? `${flag(champions[p])} ${champions[p]}` : <span style={{ opacity: .4 }}>sin elegir</span>}{realChampion && champions[p] === realChampion && " 🏆"}</span>
+              </div>
+            ))}
+          </div>
+          {realChampion && <div style={S.champOfficial}><span style={{ fontSize: 12, letterSpacing: 2, opacity: .6 }}>🏆 CAMPEÓN OFICIAL</span><div style={{ fontSize: 56, marginTop: 6 }}>{flag(realChampion)}</div><div className="pm-shine" style={{ fontFamily: "'Anton',sans-serif", fontSize: 36 }}>{realChampion}</div></div>}
+        </div>
+        );
+      })()}
+
+      {tab === "bracket" && (
+        <div className="pm-rise">
+          <p style={S.hint}>Llave de eliminatorias. {me === ADMIN ? "Agrégalas desde admin" : "Manuel las irá agregando"} cuando se definan los cruces. Predice el marcador aquí; se revela al terminar cada partido.</p>
+          {bracket.length === 0 ? (
+            <div style={S.bracketEmpty}><div style={{ fontSize: 40, marginBottom: 10 }}>🗝️</div><div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>Todavía no hay eliminatorias</div><div style={{ fontSize: 14, opacity: .65, maxWidth: 380, margin: "0 auto" }}>Aparecerán aquí como llave cuando se agreguen.</div></div>
+          ) : (() => {
+            const Card = (m, isFinal) => {
+              const pr = predictions[m.id]?.[me] || {}; const res = results[m.id] || {};
+              const closed = res.h != null && res.a != null; const locked = isLocked(m);
+              const s = scorePrediction(pr, res); const wH = closed && res.h > res.a, wA = closed && res.a > res.h; const count = betCount(m.id);
+              return (
+                <div key={m.id} className="pm-card" style={{ ...S.koGame, ...(isFinal ? S.bracketFinal : {}) }}>
+                  <div style={{ ...S.koTeam, ...(wH ? S.bracketWin : {}) }}><span style={S.koName}>{flag(m.home)} {m.home}</span><input className="pm-inp" type="number" min="0" value={pr.h ?? ""} onChange={(e) => setPred(m.id, "h", e.target.value)} style={S.koInp} disabled={locked} /></div>
+                  <div style={{ ...S.koTeam, ...(wA ? S.bracketWin : {}), borderTop: "1px solid #1a2a4d" }}><span style={S.koName}>{flag(m.away)} {m.away}</span><input className="pm-inp" type="number" min="0" value={pr.a ?? ""} onChange={(e) => setPred(m.id, "a", e.target.value)} style={S.koInp} disabled={locked} /></div>
+                  <div style={S.koMeta}><span>{(m.date || "").split(" · ")[0]}</span>{closed ? <span style={{ color: s === 3 ? "#22c55e" : s === 1 ? "#ffcd00" : "#a85", fontWeight: 700 }}>+{s} · {res.h}-{res.a}</span> : <span>🔒 {count}/{PLAYERS.length}</span>}</div>
+                </div>
+              );
+            };
+            return (
+              <div style={S.koScroll}><div style={S.koTree}>
+                {bracket.map(({ round, games }, ri) => (
+                  <div key={round} style={S.koTreeCol}>
+                    <div style={{ ...S.bracketRoundLabel, fontSize: 12 }}>{round}</div>
+                    <div style={S.koTreeGames}>{games.map((m) => (<div key={m.id} style={S.koTreePair}>{Card(m, round === "Final")}{ri < bracket.length - 1 && <span style={S.connOut} />}{ri > 0 && <span style={S.connIn} />}</div>))}</div>
+                  </div>
+                ))}
+                {realChampion && <div style={S.koTreeCol}><div style={{ ...S.bracketRoundLabel, fontSize: 12 }}>Campeón</div><div style={S.koTreeGames}><div style={S.koTreePair}><div style={S.koChampBox}><div className="pm-trophy" style={{ fontSize: 32 }}>🏆</div><div style={{ fontSize: 30, marginTop: 4 }}>{flag(realChampion)}</div><div className="pm-shine" style={{ fontFamily: "'Anton',sans-serif", fontSize: 18 }}>{realChampion}</div></div><span style={S.connIn} /></div></div></div>}
+              </div></div>
+            );
+          })()}
+        </div>
+      )}
+
+      {tab === "tabla" && (
+        <div className="pm-rise">
+          <p style={S.hint}>Posiciones en vivo. 🎯 rey del exacto · 🔥 racha activa · ⚡ mejor racha · 🏆 acertó el campeón.</p>
+          {standings.map((row, i) => {
+            const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+            return (
+              <div key={row.name} className={"pm-card" + (i === 0 ? " pm-leader" : "")} style={{ ...S.standRow, ...(row.name === me ? { borderColor: "#ffcd00" } : {}), ...(i === 0 ? { background: "linear-gradient(100deg,#0a1a3a,#0e1a33)", borderColor: "#06348c" } : {}) }}>
+                <div style={{ ...S.rank, ...(i === 0 ? { background: "#ffcd00", color: "#1a1207", boxShadow: "0 0 16px rgba(212,160,23,.5)" } : {}) }}>{medal || i + 1}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 18 }}>{row.name}{row.name === me && <span style={{ fontSize: 11, color: "#ffcd00", marginLeft: 8 }}>tú</span>}</div>
+                  {row.badges.length > 0 && <div style={S.badgeRow}>{row.badges.map((b, j) => <span key={j} title={b.t} style={S.badgeChip}>{b.e}</span>)}</div>}
+                </div>
+                <div style={S.statMini}>{row.exact} exactos</div>
+                <div style={S.statMini}>{row.hits} aciertos</div>
+                <div style={S.pts}>{row.pts}<span style={{ fontSize: 11, opacity: .5 }}> pts</span></div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {me === ADMIN && <button onClick={() => setAdminOpen(!adminOpen)} style={S.adminToggle}>{adminOpen ? "× Cerrar admin" : "⚙ Admin · resultados y partidos"}</button>}
+
+      {adminOpen && me === ADMIN && (
+        <div style={S.adminPanel} className="pm-rise">
+          <h3 style={S.adminH}>👥 Jugadores ({players.length})</h3>
+          <div style={S.playerChips}>
+            {players.map((p) => (
+              <span key={p} style={S.playerChip}>
+                {p}{p === ADMIN ? <span style={{ fontSize: 9, opacity: .6, marginLeft: 4 }}>admin</span>
+                  : <button onClick={() => removePlayer(p)} style={S.playerRemove} title="Quitar">×</button>}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+            <input placeholder="Nombre del nuevo jugador" value={newPlayer}
+              onChange={(e) => setNewPlayer(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { addPlayer(newPlayer); setNewPlayer(""); } }}
+              style={{ ...S.adminText, flex: 1 }} />
+            <button onClick={() => { addPlayer(newPlayer); setNewPlayer(""); }} style={S.addBtn}>+ Agregar</button>
+          </div>
+          <p style={{ fontSize: 11, opacity: .55, margin: "4px 0 0" }}>El jugador nuevo aparecerá en el popup de inicio y en la tabla. Quitar a alguien no borra lo que ya apostó.</p>
+
+          <h3 style={{ ...S.adminH, marginTop: 24 }}>Cargar resultados oficiales</h3>
+          {matches.map((m) => {
+            const res = results[m.id] || {};
+            return (
+              <div key={m.id} style={S.adminRow}>
+                <span style={{ flex: 1, fontSize: 13 }}>{flag(m.home)} {m.home} vs {m.away} {flag(m.away)}</span>
+                <input className="pm-inp" type="number" min="0" value={res.h ?? ""} onChange={(e) => setResult(m.id, "h", e.target.value)} style={S.adminInp} />
+                <span style={{ opacity: .5 }}>:</span>
+                <input className="pm-inp" type="number" min="0" value={res.a ?? ""} onChange={(e) => setResult(m.id, "a", e.target.value)} style={S.adminInp} />
+                {isKO(m.group) && <button onClick={() => delMatch(m.id)} style={S.delBtn}>borrar</button>}
+              </div>
+            );
+          })}
+          <h3 style={{ ...S.adminH, marginTop: 24 }}>Definir campeón oficial</h3>
+          <select value={realChampion} onChange={(e) => saveRealChampion(e.target.value)} style={{ ...S.adminText, minWidth: 200 }}>
+            <option value="">— Sin definir —</option>
+            {[...new Set(CHAMPION_PICKS)].map((c) => <option key={c} value={c}>{flag(c)} {c}</option>)}
+          </select>
+          <h3 style={{ ...S.adminH, marginTop: 24 }}>Agregar partido (eliminatorias)</h3>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input placeholder="Fase (Octavos, Cuartos, Final…)" value={newM.group} onChange={(e) => setNewM({ ...newM, group: e.target.value })} style={S.adminText} />
+            <input placeholder="Local" value={newM.home} onChange={(e) => setNewM({ ...newM, home: e.target.value })} style={S.adminText} />
+            <input placeholder="Visitante" value={newM.away} onChange={(e) => setNewM({ ...newM, away: e.target.value })} style={S.adminText} />
+            <input placeholder="Fecha (ej. Sáb 4 Jul · 4:00 PM)" value={newM.date} onChange={(e) => setNewM({ ...newM, date: e.target.value })} style={{ ...S.adminText, width: 200 }} />
+            <button onClick={addMatch} style={S.addBtn}>+ Agregar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const S = {
+  wrap: { fontFamily: "'Archivo', sans-serif", background: "radial-gradient(130% 90% at 0% 0%, #0a1430 0%, #0a1428 45%, #070d1e 100%)", backgroundAttachment: "fixed", color: "#eef4ff", minHeight: "100vh", padding: "32px clamp(16px,5vw,56px)", maxWidth: 1000, margin: "0 auto" },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 16, marginBottom: 20 },
+  kicker: { fontSize: 12, letterSpacing: 3, color: "#ffcd00", fontWeight: 700 },
+  title: { fontFamily: "'Anton', sans-serif", fontSize: "clamp(40px,8vw,72px)", margin: "4px 0 0", lineHeight: .9, letterSpacing: 1 },
+  meBox: { display: "flex", flexDirection: "column", gap: 4 },
+  meFixed: { display: "flex", alignItems: "center", gap: 10, background: "#0e1a33", border: "1px solid #27396b", borderRadius: 8, padding: "8px 12px" },
+  saveStatus: { fontSize: 10.5, fontWeight: 700, color: "#8ba0c8", textAlign: "right", marginTop: 4 },
+  changeBtn: { background: "transparent", color: "#8ba0c8", border: "1px solid #27396b", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  gateScreen: { fontFamily: "'Archivo', sans-serif", background: "radial-gradient(130% 90% at 50% 0%, #0e1f47 0%, #0a1428 45%, #070d1e 100%)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", position: "relative", overflow: "hidden" },
+  gateGlow: { position: "absolute", top: "-10%", left: "50%", transform: "translateX(-50%)", width: 500, height: 400, background: "radial-gradient(circle, rgba(255,205,0,.14), transparent 65%)", pointerEvents: "none" },
+  gateInner: { position: "relative", display: "flex", flexDirection: "column", alignItems: "center", maxWidth: 460, width: "100%", color: "#eef4ff" },
+  gateKicker: { fontSize: 12, letterSpacing: 3, color: "#ffcd00", fontWeight: 700, textAlign: "center", marginTop: 12 },
+  gateAsk: { fontFamily: "'Anton',sans-serif", fontSize: 22, color: "#eef4ff", margin: "22px 0 14px", letterSpacing: .5 },
+  gateGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px,1fr))", gap: 10, width: "100%" },
+  gateBtn: { background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 14, padding: "16px 12px", color: "#eef4ff", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 },
+  gateAvatar: { width: 44, height: 44, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Anton',sans-serif", fontSize: 20, color: "#0a1428", flexShrink: 0 },
+  gateLock: { fontSize: 10, fontWeight: 700, color: "#ffcd00", opacity: .85 },
+  pinPanel: { display: "flex", flexDirection: "column", alignItems: "center", marginTop: 26, padding: "28px 24px", background: "#0e1a33", border: "1px solid #27396b", borderRadius: 18, width: "100%", maxWidth: 320, boxShadow: "0 12px 40px rgba(0,0,0,.5)" },
+  gatePinInp: { width: 160, textAlign: "center", letterSpacing: 8, fontSize: 22, fontWeight: 700, background: "#0a1428", color: "#ffcd00", border: "1px solid #27396b", borderRadius: 10, padding: "12px", fontFamily: "inherit" },
+  pinBack: { background: "transparent", color: "#8ba0c8", border: "1px solid #27396b", borderRadius: 8, padding: "10px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  pinEnter: { background: "#ffcd00", color: "#0a1428", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  select: { background: "#16264a", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 8, padding: "8px 12px", fontSize: 16, fontFamily: "inherit", fontWeight: 700 },
+  errBar: { background: "#5a1a1a", color: "#ffd9d9", border: "1px solid #8a3a3a", borderRadius: 10, padding: "10px 14px", fontSize: 13, marginBottom: 16 },
+  nav: { display: "flex", gap: 4, background: "#0e1a33", padding: 4, borderRadius: 12, marginBottom: 24, flexWrap: "wrap" },
+  navBtn: { flex: 1, minWidth: 100, background: "transparent", color: "#8ba0c8", border: "none", padding: "12px", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  navBtnActive: { background: "#ffcd00", color: "#0a1428", boxShadow: "0 4px 14px rgba(212,160,23,.35)" },
+  hint: { fontSize: 14, opacity: .7, marginBottom: 20, lineHeight: 1.5 },
+  groupLabel: { fontFamily: "'Anton', sans-serif", fontSize: 22, color: "#ffcd00", letterSpacing: 1, marginBottom: 10 },
+  dateLabel: { fontFamily: "'Anton',sans-serif", fontSize: 18, color: "#ffcd00", letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" },
+  row: { display: "flex", alignItems: "center", gap: 8, background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 9, padding: "6px 12px" },
+  rowMeta: { display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, width: 42, gap: 1 },
+  rowTime: { fontSize: 9, opacity: .55, whiteSpace: "nowrap" },
+  rowTeam: { display: "flex", alignItems: "center", gap: 7, fontSize: 13.5, fontWeight: 500, flex: 1, minWidth: 0 },
+  rowFlag: { fontSize: 20, flexShrink: 0 },
+  rowName: { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  rowInp: { width: 30, height: 30, textAlign: "center", fontSize: 15, fontWeight: 700, background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 6, fontFamily: "inherit", flexShrink: 0, opacity: 1, WebkitTextFillColor: "#eef4ff" },
+  rowInpSaved: { background: "#1a2a4d", borderColor: "#ffcd00", color: "#ffcd00", WebkitTextFillColor: "#ffcd00" },
+  rowColon: { opacity: .35, flexShrink: 0 },
+  rowStatus: { fontSize: 10.5, fontWeight: 700, minWidth: 58, textAlign: "right", flexShrink: 0 },
+  rowAction: { minWidth: 72, display: "flex", justifyContent: "flex-end", flexShrink: 0 },
+  saveBtn: { background: "#ffcd00", color: "#0a1428", border: "none", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  saveBtnOff: { background: "#1a2a4d", color: "#5a6a8a", cursor: "not-allowed" },
+  editBtn: { background: "transparent", color: "#22c55e", border: "1px solid #1e7a40", borderRadius: 7, padding: "6px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  savedFlash: { color: "#0a1428", background: "#22c55e", borderRadius: 7, padding: "6px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" },
+  reveal: { display: "flex", flexWrap: "wrap", gap: 6, padding: "8px 6px 0", justifyContent: "center" },
+  revealToggle: { width: "100%", background: "transparent", color: "#8ba0c8", border: "1px solid #1a2a4d", borderRadius: 8, padding: "6px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  revealItem: { display: "flex", alignItems: "center", gap: 6, fontSize: 11, background: "#0a1228", border: "1px solid #1a2a4d", borderRadius: 8, padding: "4px 9px" },
+  mapGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 12 },
+  mapNode: { background: "#0e1a33", border: "1px solid #1a2a4d", borderTop: "3px solid #ffcd00", borderRadius: 14, padding: 16, boxShadow: "0 6px 18px rgba(0,0,0,.3)" },
+  mapNodeTitle: { fontFamily: "'Anton',sans-serif", color: "#ffcd00", fontSize: 18, marginBottom: 10, borderBottom: "1px solid #1a2a4d", paddingBottom: 8 },
+  groupTeam: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "5px 0", borderBottom: "1px solid #16264a" },
+  pathList: { display: "flex", flexDirection: "column", gap: 8 },
+  pathStep: { display: "flex", alignItems: "center", gap: 14, background: "#0e1a33", border: "1px solid #1a2a4d", borderLeft: "3px solid #ffcd00", borderRadius: 12, padding: "14px 16px" },
+  pathNum: { fontSize: 26, flexShrink: 0, width: 34, textAlign: "center" },
+  pathTitle: { fontFamily: "'Anton',sans-serif", fontSize: 18, letterSpacing: .5 },
+  pathCount: { fontFamily: "'Archivo',sans-serif", fontSize: 12, fontWeight: 700, color: "#ffcd00", marginLeft: 8 },
+  pathDesc: { fontSize: 12.5, opacity: .7, marginTop: 2 },
+  pathDate: { fontSize: 11, fontWeight: 700, color: "#8ba0c8", textAlign: "right", flexShrink: 0, whiteSpace: "nowrap" },
+  rulesGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px,1fr))", gap: 10 },
+  ruleCard: { display: "flex", alignItems: "center", gap: 14, background: "#0e1a33", border: "1px solid #1a2a4d", borderLeft: "3px solid #ffcd00", borderRadius: 12, padding: "14px 16px" },
+  rulePts: { fontFamily: "'Anton',sans-serif", fontSize: 32, color: "#ffcd00", flexShrink: 0, width: 50, textAlign: "center", lineHeight: 1 },
+  rulePtsLbl: { fontFamily: "'Archivo',sans-serif", fontSize: 11, fontWeight: 700, opacity: .6, marginLeft: 2 },
+  ruleTitle: { fontWeight: 700, fontSize: 15 },
+  ruleDesc: { fontSize: 12.5, opacity: .7, marginTop: 3, lineHeight: 1.4 },
+  rulesNote: { marginTop: 12, background: "#0a1a3a", border: "1px solid #06348c", borderRadius: 12, padding: "12px 16px", fontSize: 13, lineHeight: 1.5, opacity: .85 },
+  standRow: { display: "flex", alignItems: "center", gap: 14, background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 14, padding: "14px 18px", marginBottom: 8 },
+  rank: { width: 32, height: 32, borderRadius: 8, background: "#1a2a4d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontFamily: "'Anton',sans-serif", flexShrink: 0 },
+  statMini: { fontSize: 12, opacity: .6, minWidth: 64, textAlign: "right" },
+  badgeRow: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 },
+  badgeChip: { fontSize: 14, lineHeight: 1, cursor: "default" },
+  pts: { fontFamily: "'Anton',sans-serif", fontSize: 28, color: "#ffcd00", minWidth: 60, textAlign: "right" },
+  champHero: { position: "relative", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "20px 0 26px", marginBottom: 18, overflow: "hidden" },
+  champGlow: { position: "absolute", top: -20, left: "50%", transform: "translateX(-50%)", width: 280, height: 200, background: "radial-gradient(circle, rgba(212,160,23,.22), transparent 65%)", pointerEvents: "none" },
+  champPickCard: { background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 16, padding: 24, textAlign: "center", marginBottom: 24 },
+  champSelect: { background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 10, padding: "12px 16px", fontSize: 16, fontFamily: "inherit", fontWeight: 700, width: "100%", maxWidth: 320 },
+  champBig: { marginBottom: 14 },
+  champGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 10, marginBottom: 24 },
+  champCell: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 12, padding: "14px 16px" },
+  champOfficial: { textAlign: "center", padding: "28px", background: "linear-gradient(160deg,#0a1a3a,#0a1228)", border: "1px solid #06348c", borderRadius: 16 },
+  bracketEmpty: { textAlign: "center", padding: "48px 20px", background: "#0e1a33", border: "1px dashed #27396b", borderRadius: 16 },
+  bracketRoundLabel: { fontFamily: "'Anton',sans-serif", fontSize: 16, color: "#ffcd00", letterSpacing: 1, textAlign: "center", marginBottom: 14, textTransform: "uppercase" },
+  bracketFinal: { border: "1px solid #06348c", background: "linear-gradient(140deg,#0a1a3a,#0e1a33)", boxShadow: "0 0 20px rgba(212,160,23,.18)" },
+  bracketWin: { color: "#ffcd00", fontWeight: 800 },
+  koScroll: { overflowX: "auto", paddingBottom: 16, WebkitOverflowScrolling: "touch" },
+  koTree: { display: "flex", gap: 0, minWidth: "min-content", alignItems: "stretch" },
+  koTreeCol: { display: "flex", flexDirection: "column", minWidth: 132, paddingRight: 22 },
+  koTreeGames: { display: "flex", flexDirection: "column", justifyContent: "space-around", gap: 10, flex: 1 },
+  koTreePair: { position: "relative", display: "flex", alignItems: "center" },
+  connOut: { position: "absolute", right: -22, top: "50%", width: 22, height: 2, background: "#27396b" },
+  connIn: { position: "absolute", left: -22, top: "50%", width: 22, height: 2, background: "#27396b" },
+  koGame: { background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 9, overflow: "hidden", width: "100%", flex: 1 },
+  koTeam: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 500, padding: "6px 8px" },
+  koName: { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  koInp: { width: 26, height: 24, textAlign: "center", fontSize: 12, fontWeight: 700, background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 5, fontFamily: "inherit", flexShrink: 0 },
+  koMeta: { display: "flex", justifyContent: "space-between", fontSize: 9, opacity: .65, padding: "3px 8px", borderTop: "1px solid #1a2a4d", background: "#0a1228" },
+  koChampBox: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", textAlign: "center", padding: "16px 8px", background: "linear-gradient(160deg,#0a1a3a,#0a1228)", border: "1px solid #06348c", borderRadius: 12 },
+  adminToggle: { marginTop: 32, background: "transparent", color: "#8ba0c8", border: "1px dashed #27396b", borderRadius: 10, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 700 },
+  adminPanel: { marginTop: 12, background: "#0a1228", border: "1px solid #1a2a4d", borderRadius: 14, padding: 20 },
+  adminH: { fontFamily: "'Anton',sans-serif", color: "#ffcd00", fontSize: 16, margin: "0 0 12px", letterSpacing: 1 },
+  adminRow: { display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #16264a" },
+  adminInp: { width: 38, height: 32, textAlign: "center", background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 6, fontFamily: "inherit" },
+  adminText: { background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 },
+  delBtn: { background: "transparent", color: "#a85", border: "none", fontSize: 11, cursor: "pointer", fontFamily: "inherit" },
+  addBtn: { background: "#ffcd00", color: "#0a1428", border: "none", borderRadius: 8, padding: "9px 16px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  playerChips: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  playerChip: { display: "inline-flex", alignItems: "center", background: "#0e1a33", border: "1px solid #27396b", borderRadius: 20, padding: "5px 12px", fontSize: 13, fontWeight: 700, color: "#eef4ff" },
+  playerRemove: { background: "transparent", color: "#ec5a5a", border: "none", fontSize: 16, lineHeight: 1, cursor: "pointer", marginLeft: 6, padding: 0, fontFamily: "inherit" },
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<PollaMundial />);
+</script>
+</body>
+</html>
