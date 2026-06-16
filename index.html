@@ -34,11 +34,25 @@
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#ffcd00;font-family:system-ui,sans-serif;font-size:16px;text-align:center;padding:20px;">Cargando la polla…</div></div>
 
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+<script>
+window.addEventListener("load", function () {
+  setTimeout(function () {
+    if (!window.React || !window.ReactDOM || !window.Babel) {
+      document.getElementById("root").innerHTML =
+        '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#eef4ff;font-family:system-ui,sans-serif;text-align:center;padding:24px;gap:14px;">'
+        + '<div style="font-size:18px;font-weight:700;color:#ffcd00;">No se pudo cargar la app</div>'
+        + '<div style="font-size:14px;opacity:.75;max-width:340px;line-height:1.5;">Puede ser tu conexion o el servidor. Toca para reintentar.</div>'
+        + '<button onclick="location.reload(true)" style="background:#ffcd00;color:#0a1428;border:none;border-radius:10px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;">Reintentar</button>'
+        + '</div>';
+    }
+  }, 8000);
+});
+</script>
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
