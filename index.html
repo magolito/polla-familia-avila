@@ -230,10 +230,32 @@ function PollaMundial() {
   const dirtyRef = useRef(false);
   const [saving, setSaving] = useState(false);
 
+  // Limpia un valor de marcador: entero entre 0 y 99, o null.
+  const cleanScore = (v) => (v == null || v === "" || isNaN(v)) ? null : Math.min(99, Math.max(0, Math.floor(+v)));
+  const cleanPreds = (preds) => {
+    const out = {};
+    for (const mId of Object.keys(preds || {})) {
+      out[mId] = {};
+      for (const pl of Object.keys(preds[mId] || {})) {
+        const x = preds[mId][pl] || {};
+        out[mId][pl] = { h: cleanScore(x.h), a: cleanScore(x.a) };
+      }
+    }
+    return out;
+  };
+  const cleanResults = (rs) => {
+    const out = {};
+    for (const mId of Object.keys(rs || {})) {
+      const x = rs[mId] || {};
+      out[mId] = { h: cleanScore(x.h), a: cleanScore(x.a) };
+    }
+    return out;
+  };
+
   const applyState = (st) => {
     if (!st) return;
-    setPredictions(st.predictions || {});
-    setResults(st.results || {});
+    setPredictions(cleanPreds(st.predictions));
+    setResults(cleanResults(st.results));
     setChampions(st.champions || {});
     setRealChampion(st.real_champion || "");
     if (Array.isArray(st.players) && st.players.length) setPlayers(st.players);
@@ -298,7 +320,7 @@ function PollaMundial() {
 
   // Escribir en el borrador local (no guarda todavía)
   const setDraftScore = (matchId, side, val) => {
-    const v = val === "" ? null : Math.max(0, parseInt(val) || 0);
+    const v = val === "" ? null : Math.min(99, Math.max(0, parseInt(val) || 0));
     const base = draft[matchId] || predictions[matchId]?.[me] || {};
     setDraft({ ...draft, [matchId]: { ...base, [side]: v } });
   };
@@ -320,7 +342,7 @@ function PollaMundial() {
   };
   // Guardado directo (usado en el bracket de eliminatorias)
   const setPred = (matchId, side, val) => {
-    const v = val === "" ? null : Math.max(0, parseInt(val) || 0);
+    const v = val === "" ? null : Math.min(99, Math.max(0, parseInt(val) || 0));
     const cur = predictions[matchId]?.[me] || {};
     const next = { ...predictions, [matchId]: { ...(predictions[matchId] || {}), [me]: { ...cur, [side]: v } } };
     predRef.current = next; setPredictions(next); queueSave();
@@ -331,7 +353,7 @@ function PollaMundial() {
     setEditing({ ...editing, [matchId]: true });
   };
   const setResult = (matchId, side, val) => {
-    const v = val === "" ? null : Math.max(0, parseInt(val) || 0);
+    const v = val === "" ? null : Math.min(99, Math.max(0, parseInt(val) || 0));
     const cur = results[matchId] || {};
     const next = { ...results, [matchId]: { ...cur, [side]: v } };
     resRef.current = next; setResults(next); queueSave();
