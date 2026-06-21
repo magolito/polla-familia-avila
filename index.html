@@ -499,32 +499,35 @@ function PollaMundial() {
     return arr.sort((a, b) => b.pts - a.pts || b.exact - a.exact);
   }, [matches, predictions, results, champions, realChampion]);
 
-  // Puntos por grupo: para cada grupo, suma los puntos de cada jugador SOLO en
-  // los partidos de ese grupo que ya tienen resultado. Devuelve ranking ordenado.
-  const groupStandings = useMemo(() => {
+  // Tabla REAL del Mundial por grupo: calcula posición de cada equipo a partir
+  // de los resultados oficiales que carga el admin. 3 pts victoria, 1 empate, 0 derrota.
+  const groupTables = useMemo(() => {
     const out = {};
     matches.forEach((m) => {
       if (isKO(m.group)) return;
-      const r = results[m.id];
-      const hasResult = r && r.h != null && r.a != null;
-      if (!out[m.group]) out[m.group] = { players: Object.fromEntries(PLAYERS.map((p) => [p, 0])), played: 0 };
-      if (!hasResult) return;
-      out[m.group].played++;
-      PLAYERS.forEach((p) => {
-        const s = scorePrediction(predictions[m.id]?.[p], r);
-        if (s != null) out[m.group].players[p] += s;
+      if (!out[m.group]) out[m.group] = {};
+      // asegurar que ambos equipos existan en la tabla del grupo
+      [m.home, m.away].forEach((t) => {
+        if (!out[m.group][t]) out[m.group][t] = { team: t, pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, pts: 0 };
       });
+      const r = results[m.id];
+      if (!r || r.h == null || r.a == null) return; // sin resultado aún
+      const H = out[m.group][m.home], A = out[m.group][m.away];
+      H.pj++; A.pj++;
+      H.gf += r.h; H.gc += r.a; A.gf += r.a; A.gc += r.h;
+      if (r.h > r.a) { H.g++; H.pts += 3; A.p++; }
+      else if (r.h < r.a) { A.g++; A.pts += 3; H.p++; }
+      else { H.e++; A.e++; H.pts++; A.pts++; }
     });
-    // convertir a arrays ordenados, solo jugadores con al menos algo o si ya hubo partidos
+    // ordenar cada grupo: puntos, luego diferencia de gol, luego goles a favor
     const ranked = {};
     Object.keys(out).forEach((grp) => {
-      const arr = Object.entries(out[grp].players)
-        .map(([name, pts]) => ({ name, pts }))
-        .sort((a, b) => b.pts - a.pts);
-      ranked[grp] = { played: out[grp].played, ranking: arr };
+      ranked[grp] = Object.values(out[grp]).sort((a, b) =>
+        b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc) || b.gf - a.gf || a.team.localeCompare(b.team)
+      );
     });
     return ranked;
-  }, [matches, predictions, results]);
+  }, [matches, results]);
 
   const prevExactRef = useRef(null);
   useEffect(() => {
@@ -671,22 +674,35 @@ function PollaMundial() {
             {Object.entries(grouped).filter(([grp]) => !isKO(grp)).map(([grp, ms]) => {
               const teams = [...new Set(ms.flatMap((m) => [m.home, m.away]))];
               const isCol = teams.includes("Colombia");
+              const table = groupTables[grp] || [];
+              const anyPlayed = table.some((t) => t.pj > 0);
               return (
                 <div key={grp} style={{ ...S.mapNode, ...(isCol ? { borderColor: "#ffcd00" } : {}) }}>
                   <div style={S.mapNodeTitle}>Grupo {grp}</div>
-                  {teams.map((t) => <div key={t} style={S.groupTeam}><span style={{ fontSize: 18 }}>{flag(t)}</span><span style={t === "Colombia" ? { color: "#ffcd00", fontWeight: 700 } : {}}>{t}</span></div>)}
-                  {groupStandings[grp] && groupStandings[grp].played > 0 && (
-                    <div style={S.groupLeaders}>
-                      <div style={S.groupLeadersTitle}>🏅 Líderes <span style={{ opacity: .5, fontWeight: 400 }}>· {groupStandings[grp].played} {groupStandings[grp].played === 1 ? "partido" : "partidos"}</span></div>
-                      {groupStandings[grp].ranking.slice(0, 3).map((r, i) => (
-                        <div key={r.name} style={S.groupLeaderRow}>
-                          <span style={{ opacity: .6, width: 16 }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>
-                          <span style={{ flex: 1, ...(r.name === me ? { color: "#ffcd00", fontWeight: 700 } : {}) }}>{r.name}</span>
-                          <span style={{ fontWeight: 700, color: "#ffcd00" }}>{r.pts}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div style={S.tableHead}>
+                    <span style={{ width: 18 }}></span>
+                    <span style={{ flex: 1 }}></span>
+                    <span style={S.tableCol}>PJ</span>
+                    <span style={S.tableCol}>DG</span>
+                    <span style={{ ...S.tableCol, width: 26, color: "#ffcd00" }}>Pts</span>
+                  </div>
+                  {table.map((t, i) => {
+                    const clasifica = anyPlayed && i < 2;
+                    const dg = t.gf - t.gc;
+                    return (
+                      <div key={t.team} style={{ ...S.tableRow, ...(clasifica ? S.tableRowQ : {}) }}>
+                        <span style={S.tablePos}>{i + 1}</span>
+                        <span style={{ ...S.tableTeam, ...(t.team === "Colombia" ? { color: "#ffcd00", fontWeight: 700 } : {}) }}>
+                          <span style={{ fontSize: 15 }}>{flag(t.team)}</span>
+                          <span style={S.tableTeamName}>{t.team}</span>
+                        </span>
+                        <span style={S.tableCol}>{t.pj}</span>
+                        <span style={S.tableCol}>{dg > 0 ? "+" + dg : dg}</span>
+                        <span style={{ ...S.tableCol, width: 26, fontWeight: 700, color: "#ffcd00" }}>{t.pts}</span>
+                      </div>
+                    );
+                  })}
+                  {anyPlayed && <div style={S.tableLegend}>🟨 los 2 primeros clasifican</div>}
                 </div>
               );
             })}
@@ -1033,9 +1049,14 @@ const S = {
   mapNode: { background: "#0e1a33", border: "1px solid #1a2a4d", borderTop: "3px solid #ffcd00", borderRadius: 14, padding: 16, boxShadow: "0 6px 18px rgba(0,0,0,.3)" },
   mapNodeTitle: { fontFamily: "'Anton',sans-serif", color: "#ffcd00", fontSize: 18, marginBottom: 10, borderBottom: "1px solid #1a2a4d", paddingBottom: 8 },
   groupTeam: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "5px 0", borderBottom: "1px solid #16264a" },
-  groupLeaders: { marginTop: 12, paddingTop: 10, borderTop: "1px solid #27396b" },
-  groupLeadersTitle: { fontSize: 11, fontWeight: 700, color: "#8ba0c8", marginBottom: 6, textTransform: "uppercase", letterSpacing: .5 },
-  groupLeaderRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0" },
+  tableHead: { display: "flex", alignItems: "center", gap: 6, fontSize: 9, fontWeight: 700, color: "#8ba0c8", padding: "0 0 4px", borderBottom: "1px solid #27396b", marginBottom: 2 },
+  tableRow: { display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "6px 0", borderBottom: "1px solid #16264a" },
+  tableRowQ: { background: "linear-gradient(90deg, rgba(255,205,0,.10), transparent)", borderRadius: 4 },
+  tablePos: { width: 18, textAlign: "center", fontWeight: 700, fontSize: 11, color: "#8ba0c8" },
+  tableTeam: { flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0, color: "#eef4ff" },
+  tableTeamName: { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  tableCol: { width: 22, textAlign: "center", fontSize: 12, color: "#cdd8ee" },
+  tableLegend: { fontSize: 10, opacity: .55, marginTop: 8, textAlign: "center" },
   pathList: { display: "flex", flexDirection: "column", gap: 8 },
   pathStep: { display: "flex", alignItems: "center", gap: 14, background: "#0e1a33", border: "1px solid #1a2a4d", borderLeft: "3px solid #ffcd00", borderRadius: 12, padding: "14px 16px" },
   pathNum: { fontSize: 26, flexShrink: 0, width: 34, textAlign: "center" },
