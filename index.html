@@ -270,9 +270,28 @@ function PollaMundial() {
     return out;
   };
 
-  const applyState = (st) => {
+  const applyState = (st, fromPoll) => {
     if (!st) return;
-    setPredictions(cleanPreds(st.predictions));
+    let incoming = cleanPreds(st.predictions);
+    if (fromPoll) {
+      // El polling no debe borrar MIS apuestas recientes: si yo tengo una apuesta
+      // en el ref local que el servidor todavía no refleja, la conservo.
+      const mineLocal = predRef.current || {};
+      const merged = { ...incoming };
+      for (const mId of Object.keys(mineLocal)) {
+        const myBet = mineLocal[mId]?.[me];
+        if (myBet && myBet.h != null && myBet.a != null) {
+          const serverBet = incoming[mId]?.[me];
+          // Si el servidor no tiene mi apuesta para ese partido, la mantengo.
+          if (!serverBet || serverBet.h == null || serverBet.a == null) {
+            merged[mId] = { ...(incoming[mId] || {}), [me]: myBet };
+          }
+        }
+      }
+      incoming = merged;
+    }
+    predRef.current = incoming;
+    setPredictions(incoming);
     setResults(cleanResults(st.results));
     setChampions(st.champions || {});
     setRealChampion(st.real_champion || "");
@@ -328,7 +347,7 @@ function PollaMundial() {
       if (Date.now() - lastPushRef.current < 8000) return;      // acabo de guardar, espera
       try {
         const { state, matches: mt } = await apiGet();
-        applyState(state);
+        applyState(state, true);
         if (mt) setMatches(mt);
         setSaveErr(false);
       } catch (e) { /* reintenta luego */ }
@@ -354,6 +373,7 @@ function PollaMundial() {
 
     // Guardado directo y confirmado: solo marca "guardado" si el servidor responde OK
     setSavingMatch((s) => ({ ...s, [matchId]: true }));
+    savingRef.current = true;        // bloquea el polling mientras envío
     lastPushRef.current = Date.now();
     try {
       await apiPost({
@@ -376,6 +396,8 @@ function PollaMundial() {
       alert("⚠️ No se pudo guardar tu apuesta. Revisa tu conexión y vuelve a darle Guardar.");
       // NO limpiamos el borrador ni salimos de edición: el botón Guardar sigue ahí para reintentar
     }
+    savingRef.current = false;
+    lastPushRef.current = Date.now();
     setSavingMatch((s) => { const n = { ...s }; delete n[matchId]; return n; });
   };
   // Guardado directo (usado en el bracket de eliminatorias)
