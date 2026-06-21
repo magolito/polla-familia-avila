@@ -29,6 +29,8 @@
   @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
   @keyframes savedPop{0%{transform:scale(.7);opacity:0}40%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
   .pm-saved{display:inline-block;animation:savedPop .3s ease-out}
+  @keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}
+  .pm-live-dot{animation:livePulse 1.2s ease-in-out infinite}
   .gate-btn{transition:transform .15s ease, border-color .15s ease, background .15s ease}
   .gate-btn:hover{transform:translateY(-3px);border-color:#ffcd00;background:#12224a}
 </style>
@@ -496,7 +498,7 @@ function PollaMundial() {
       if (maxStreak >= 3 && r.bestStreak === maxStreak) r.badges.push({ e: "⚡", t: `Mejor racha (${r.bestStreak})` });
       if (r.champ) r.badges.push({ e: "🏆", t: "Acertó el campeón" });
     });
-    return arr.sort((a, b) => b.pts - a.pts || b.exact - a.exact);
+    return arr.sort((a, b) => b.pts - a.pts || b.exact - a.exact || b.hits - a.hits);
   }, [matches, predictions, results, champions, realChampion]);
 
   // Tabla REAL del Mundial por grupo: calcula posición de cada equipo a partir
@@ -782,7 +784,7 @@ function PollaMundial() {
                       <div style={S.rowAction}>
                         {locked ? (
                           closed ? <span style={{ color: s === 3 ? "#22c55e" : s === 1 ? "#ffcd00" : "#a85", fontWeight: 700, fontSize: 10.5 }}>+{s} · {res.h}-{res.a}</span>
-                            : <span style={{ color: "#a85", fontWeight: 700, fontSize: 10 }}>⏱ en juego</span>
+                            : <span style={S.liveTag}><span className="pm-live-dot" style={S.liveDot} />EN VIVO</span>
                         ) : justSaved[m.id] ? (
                           <span className="pm-saved" style={S.savedFlash}>✓ ¡Guardado!</span>
                         ) : isEditing ? (
@@ -895,6 +897,7 @@ function PollaMundial() {
       {tab === "tabla" && (
         <div className="pm-rise">
           <p style={S.hint}>Posiciones en vivo. 🎯 rey del exacto · 🔥 racha activa · ⚡ mejor racha · 🏆 acertó el campeón.</p>
+          <div style={S.tieNote}>En caso de empate en puntos, va arriba quien tenga <b style={{ color: "#ffcd00" }}>más marcadores exactos</b>; si sigue el empate, más aciertos.</div>
           {standings.map((row, i) => {
             const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
             return (
@@ -902,6 +905,7 @@ function PollaMundial() {
                 <div style={{ ...S.rank, ...(i === 0 ? { background: "#ffcd00", color: "#1a1207", boxShadow: "0 0 16px rgba(212,160,23,.5)" } : {}) }}>{medal || i + 1}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 18 }}>{row.name}{row.name === me && <span style={{ fontSize: 11, color: "#ffcd00", marginLeft: 8 }}>tú</span>}</div>
+                  {champions[row.name] && (row.name === me || now >= CHAMPION_DEADLINE || realChampion) && <div style={S.champPick}>{flag(champions[row.name])} {champions[row.name]}{realChampion && champions[row.name] === realChampion && <span style={{ color: "#22c55e", fontWeight: 700 }}> ✓ +{CHAMPION_PTS}</span>}</div>}
                   {row.badges.length > 0 && <div style={S.badgeRow}>{row.badges.map((b, j) => <span key={j} title={b.t} style={S.badgeChip}>{b.e}</span>)}</div>}
                 </div>
                 <div style={S.statMini}>{row.exact} exactos</div>
@@ -1037,6 +1041,8 @@ const S = {
   rowColon: { opacity: .35, flexShrink: 0 },
   rowStatus: { fontSize: 10.5, fontWeight: 700, minWidth: 58, textAlign: "right", flexShrink: 0 },
   rowAction: { minWidth: 72, display: "flex", justifyContent: "flex-end", flexShrink: 0 },
+  liveTag: { display: "inline-flex", alignItems: "center", gap: 5, color: "#ff4d4d", fontWeight: 800, fontSize: 10, letterSpacing: .5 },
+  liveDot: { width: 7, height: 7, borderRadius: "50%", background: "#ff4d4d", display: "inline-block" },
   saveBtn: { background: "#ffcd00", color: "#0a1428", border: "none", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   saveBtnOff: { background: "#1a2a4d", color: "#5a6a8a", cursor: "not-allowed" },
   editBtn: { background: "transparent", color: "#22c55e", border: "1px solid #1e7a40", borderRadius: 7, padding: "6px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
@@ -1071,6 +1077,8 @@ const S = {
   ruleDesc: { fontSize: 12.5, opacity: .7, marginTop: 3, lineHeight: 1.4 },
   rulesNote: { marginTop: 12, background: "#0a1a3a", border: "1px solid #06348c", borderRadius: 12, padding: "12px 16px", fontSize: 13, lineHeight: 1.5, opacity: .85 },
   standRow: { display: "flex", alignItems: "center", gap: 14, background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 14, padding: "14px 18px", marginBottom: 8 },
+  tieNote: { fontSize: 12, opacity: .7, background: "#0a1228", border: "1px solid #1a2a4d", borderRadius: 10, padding: "10px 14px", marginBottom: 16, lineHeight: 1.5 },
+  champPick: { fontSize: 12, color: "#8ba0c8", marginTop: 3, fontWeight: 700 },
   rank: { width: 32, height: 32, borderRadius: 8, background: "#1a2a4d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontFamily: "'Anton',sans-serif", flexShrink: 0 },
   statMini: { fontSize: 12, opacity: .6, minWidth: 64, textAlign: "right" },
   badgeRow: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 },
