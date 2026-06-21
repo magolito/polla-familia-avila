@@ -532,16 +532,29 @@ function PollaMundial() {
   }, [matches, results]);
 
   const prevExactRef = useRef(null);
+  const exactReadyRef = useRef(false);
   useEffect(() => {
+    // No vigilar hasta que la carga inicial termine (evita confeti al abrir la app).
+    if (loading) return;
     const mine = standings.find((r) => r.name === me);
     const cur = mine ? mine.exact : 0;
-    if (prevExactRef.current != null && cur > prevExactRef.current) {
+    if (!exactReadyRef.current) {
+      // Primera medición estable tras cargar: solo registramos el valor base, sin confeti.
+      prevExactRef.current = cur;
+      exactReadyRef.current = true;
+      return;
+    }
+    if (cur > prevExactRef.current) {
       setConfetti(true);
       const t = setTimeout(() => setConfetti(false), 3500);
-      prevExactRef.current = cur; return () => clearTimeout(t);
+      prevExactRef.current = cur;
+      return () => clearTimeout(t);
     }
     prevExactRef.current = cur;
-  }, [standings, me]);
+  }, [standings, me, loading]);
+
+  // Si cambio de identidad (me), reiniciar la base para no disparar confeti por el cambio.
+  useEffect(() => { exactReadyRef.current = false; }, [me]);
 
   const grouped = useMemo(() => { const g = {}; matches.forEach((m) => { (g[m.group] ||= []).push(m); }); return g; }, [matches]);
   const bracket = useMemo(() => {
