@@ -221,12 +221,14 @@ function PollaMundial() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [newM, setNewM] = useState({ group: "Octavos", home: "", away: "", date: "" });
   const [newPlayer, setNewPlayer] = useState("");
+  const [adminEdit, setAdminEdit] = useState({ player: "", matchId: "", h: "", a: "" });
   const [now, setNow] = useState(Date.now());
   const [confetti, setConfetti] = useState(false);
   const [saveErr, setSaveErr] = useState(false);
   const [draft, setDraft] = useState({});      // borrador local mientras escribe: { matchId: {h,a} }
   const [editing, setEditing] = useState({});   // partidos en modo edición: { matchId: true }
   const [justSaved, setJustSaved] = useState({}); // flash "✓ Guardado!" momentáneo: { matchId: true }
+  const [savingMatch, setSavingMatch] = useState({}); // "Guardando…" mientras confirma: { matchId: true }
   const [expanded, setExpanded] = useState({});    // partidos con apuestas desplegadas: { matchId: true }
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(t); }, []);
@@ -338,8 +340,8 @@ function PollaMundial() {
     const base = draft[matchId] || predictions[matchId]?.[me] || {};
     setDraft({ ...draft, [matchId]: { ...base, [side]: v } });
   };
-  // Guardar la predicción de un partido (botón Guardar)
-  const savePred = (matchId) => {
+  // Guardar la predicción de un partido (botón Guardar) — CONFIRMADO con el servidor
+  const savePred = async (matchId) => {
     const m = matches.find((x) => x.id === matchId);
     // Doble verificación: si el partido ya empezó justo ahora, no deja guardar
     if (m && hasStarted(m, true)) { setNow(Date.now()); return; }
@@ -347,12 +349,32 @@ function PollaMundial() {
     if (d.h == null || d.a == null) return; // necesita ambos marcadores
     const next = { ...predictions, [matchId]: { ...(predictions[matchId] || {}), [me]: { h: d.h, a: d.a } } };
     predRef.current = next; setPredictions(next);
-    const nd = { ...draft }; delete nd[matchId]; setDraft(nd);
-    const ne = { ...editing }; delete ne[matchId]; setEditing(ne);
-    queueSave();
-    // flash "✓ Guardado!" por ~1.4s
-    setJustSaved((js) => ({ ...js, [matchId]: true }));
-    setTimeout(() => setJustSaved((js) => { const n = { ...js }; delete n[matchId]; return n; }), 1400);
+
+    // Guardado directo y confirmado: solo marca "guardado" si el servidor responde OK
+    setSavingMatch((s) => ({ ...s, [matchId]: true }));
+    lastPushRef.current = Date.now();
+    try {
+      await apiPost({
+        state: {
+          predictions: predRef.current, results: resRef.current,
+          champions: champRef.current, real_champion: realChampRef.current,
+          players: playersRef.current,
+        },
+      });
+      lastPushRef.current = Date.now();
+      setSaveErr(false);
+      // Éxito confirmado: ahora sí limpiamos borrador, salimos de edición y mostramos ✓
+      const nd = { ...draft }; delete nd[matchId]; setDraft(nd);
+      const ne = { ...editing }; delete ne[matchId]; setEditing(ne);
+      setJustSaved((js) => ({ ...js, [matchId]: true }));
+      setTimeout(() => setJustSaved((js) => { const n = { ...js }; delete n[matchId]; return n; }), 1400);
+    } catch (e) {
+      console.error(e);
+      setSaveErr(true);
+      alert("⚠️ No se pudo guardar tu apuesta. Revisa tu conexión y vuelve a darle Guardar.");
+      // NO limpiamos el borrador ni salimos de edición: el botón Guardar sigue ahí para reintentar
+    }
+    setSavingMatch((s) => { const n = { ...s }; delete n[matchId]; return n; });
   };
   // Guardado directo (usado en el bracket de eliminatorias)
   const setPred = (matchId, side, val) => {
@@ -381,6 +403,20 @@ function PollaMundial() {
   // Resincroniza el fixture (fechas/horas) desde el código, conservando
   // cualquier partido extra de eliminatorias que el admin haya agregado.
   // No toca apuestas, resultados ni jugadores.
+  // Admin: guardar/corregir la apuesta de cualquier jugador en cualquier partido,
+  // incluso si ya empezó. Para casos como "se le olvidó guardar".
+  const adminSavePrediction = () => {
+    const { player, matchId, h, a } = adminEdit;
+    if (!player || !matchId || h === "" || a === "") { alert("Elige jugador, partido y escribe el marcador."); return; }
+    const hh = cleanScore(h), aa = cleanScore(a);
+    const next = { ...predictions, [matchId]: { ...(predictions[matchId] || {}), [player]: { h: hh, a: aa } } };
+    predRef.current = next; setPredictions(next); queueSave();
+    const m = matches.find((x) => x.id === matchId);
+    const nombre = m ? `${m.home} vs ${m.away}` : matchId;
+    alert(`✓ Apuesta de ${player} guardada: ${hh}-${aa} en ${nombre}`);
+    setAdminEdit({ player: "", matchId: "", h: "", a: "" });
+  };
+
   const resyncFixture = async () => {
     if (!confirm("Esto actualizará las fechas y horas de los partidos a las del código (corrige las horas). No borra apuestas ni resultados. ¿Continuar?")) return;
     const seedIds = new Set(SEED_MATCHES.map((m) => m.id));
@@ -462,6 +498,33 @@ function PollaMundial() {
     });
     return arr.sort((a, b) => b.pts - a.pts || b.exact - a.exact);
   }, [matches, predictions, results, champions, realChampion]);
+
+  // Puntos por grupo: para cada grupo, suma los puntos de cada jugador SOLO en
+  // los partidos de ese grupo que ya tienen resultado. Devuelve ranking ordenado.
+  const groupStandings = useMemo(() => {
+    const out = {};
+    matches.forEach((m) => {
+      if (isKO(m.group)) return;
+      const r = results[m.id];
+      const hasResult = r && r.h != null && r.a != null;
+      if (!out[m.group]) out[m.group] = { players: Object.fromEntries(PLAYERS.map((p) => [p, 0])), played: 0 };
+      if (!hasResult) return;
+      out[m.group].played++;
+      PLAYERS.forEach((p) => {
+        const s = scorePrediction(predictions[m.id]?.[p], r);
+        if (s != null) out[m.group].players[p] += s;
+      });
+    });
+    // convertir a arrays ordenados, solo jugadores con al menos algo o si ya hubo partidos
+    const ranked = {};
+    Object.keys(out).forEach((grp) => {
+      const arr = Object.entries(out[grp].players)
+        .map(([name, pts]) => ({ name, pts }))
+        .sort((a, b) => b.pts - a.pts);
+      ranked[grp] = { played: out[grp].played, ranking: arr };
+    });
+    return ranked;
+  }, [matches, predictions, results]);
 
   const prevExactRef = useRef(null);
   useEffect(() => {
@@ -612,6 +675,18 @@ function PollaMundial() {
                 <div key={grp} style={{ ...S.mapNode, ...(isCol ? { borderColor: "#ffcd00" } : {}) }}>
                   <div style={S.mapNodeTitle}>Grupo {grp}</div>
                   {teams.map((t) => <div key={t} style={S.groupTeam}><span style={{ fontSize: 18 }}>{flag(t)}</span><span style={t === "Colombia" ? { color: "#ffcd00", fontWeight: 700 } : {}}>{t}</span></div>)}
+                  {groupStandings[grp] && groupStandings[grp].played > 0 && (
+                    <div style={S.groupLeaders}>
+                      <div style={S.groupLeadersTitle}>🏅 Líderes <span style={{ opacity: .5, fontWeight: 400 }}>· {groupStandings[grp].played} {groupStandings[grp].played === 1 ? "partido" : "partidos"}</span></div>
+                      {groupStandings[grp].ranking.slice(0, 3).map((r, i) => (
+                        <div key={r.name} style={S.groupLeaderRow}>
+                          <span style={{ opacity: .6, width: 16 }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>
+                          <span style={{ flex: 1, ...(r.name === me ? { color: "#ffcd00", fontWeight: 700 } : {}) }}>{r.name}</span>
+                          <span style={{ fontWeight: 700, color: "#ffcd00" }}>{r.pts}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -696,7 +771,7 @@ function PollaMundial() {
                         ) : justSaved[m.id] ? (
                           <span className="pm-saved" style={S.savedFlash}>✓ ¡Guardado!</span>
                         ) : isEditing ? (
-                          <button onClick={() => savePred(m.id)} disabled={!draftComplete} style={{ ...S.saveBtn, ...(draftComplete ? {} : S.saveBtnOff) }}>Guardar</button>
+                          <button onClick={() => savePred(m.id)} disabled={!draftComplete || savingMatch[m.id]} style={{ ...S.saveBtn, ...(draftComplete && !savingMatch[m.id] ? {} : S.saveBtnOff) }}>{savingMatch[m.id] ? "Guardando…" : "Guardar"}</button>
                         ) : (
                           <button onClick={() => editPred(m.id)} style={S.editBtn}>✓ Editar</button>
                         )}
@@ -852,6 +927,28 @@ function PollaMundial() {
           </div>
           <p style={{ fontSize: 11, opacity: .55, margin: "4px 0 0" }}>El jugador nuevo aparecerá en el popup de inicio y en la tabla. Quitar a alguien no borra lo que ya apostó.</p>
 
+          <h3 style={{ ...S.adminH, marginTop: 24 }}>✏️ Editar apuesta de un jugador</h3>
+          <p style={{ fontSize: 11.5, opacity: .65, margin: "0 0 10px" }}>Para corregir apuestas (ej. a alguien se le olvidó guardar). Funciona incluso si el partido ya empezó.</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+            <select value={adminEdit.player} onChange={(e) => setAdminEdit({ ...adminEdit, player: e.target.value })} style={S.adminText}>
+              <option value="">— Jugador —</option>
+              {players.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select value={adminEdit.matchId} onChange={(e) => setAdminEdit({ ...adminEdit, matchId: e.target.value })} style={{ ...S.adminText, maxWidth: 220 }}>
+              <option value="">— Partido —</option>
+              {matches.map((m) => <option key={m.id} value={m.id}>{m.home} vs {m.away} ({(m.date || "").split(" · ")[0]})</option>)}
+            </select>
+            <input type="number" min="0" placeholder="L" value={adminEdit.h} onChange={(e) => setAdminEdit({ ...adminEdit, h: e.target.value })} style={S.adminInp} />
+            <span style={{ opacity: .5 }}>:</span>
+            <input type="number" min="0" placeholder="V" value={adminEdit.a} onChange={(e) => setAdminEdit({ ...adminEdit, a: e.target.value })} style={S.adminInp} />
+            <button onClick={adminSavePrediction} style={S.addBtn}>Guardar apuesta</button>
+          </div>
+          {adminEdit.player && adminEdit.matchId && predictions[adminEdit.matchId]?.[adminEdit.player] && (
+            <p style={{ fontSize: 11.5, opacity: .7, margin: "0 0 8px" }}>
+              Apuesta actual de {adminEdit.player}: <b>{predictions[adminEdit.matchId][adminEdit.player].h}-{predictions[adminEdit.matchId][adminEdit.player].a}</b>
+            </p>
+          )}
+
           <h3 style={{ ...S.adminH, marginTop: 24 }}>Cargar resultados oficiales</h3>
           {matches.map((m) => {
             const res = results[m.id] || {};
@@ -936,6 +1033,9 @@ const S = {
   mapNode: { background: "#0e1a33", border: "1px solid #1a2a4d", borderTop: "3px solid #ffcd00", borderRadius: 14, padding: 16, boxShadow: "0 6px 18px rgba(0,0,0,.3)" },
   mapNodeTitle: { fontFamily: "'Anton',sans-serif", color: "#ffcd00", fontSize: 18, marginBottom: 10, borderBottom: "1px solid #1a2a4d", paddingBottom: 8 },
   groupTeam: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "5px 0", borderBottom: "1px solid #16264a" },
+  groupLeaders: { marginTop: 12, paddingTop: 10, borderTop: "1px solid #27396b" },
+  groupLeadersTitle: { fontSize: 11, fontWeight: 700, color: "#8ba0c8", marginBottom: 6, textTransform: "uppercase", letterSpacing: .5 },
+  groupLeaderRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0" },
   pathList: { display: "flex", flexDirection: "column", gap: 8 },
   pathStep: { display: "flex", alignItems: "center", gap: 14, background: "#0e1a33", border: "1px solid #1a2a4d", borderLeft: "3px solid #ffcd00", borderRadius: 12, padding: "14px 16px" },
   pathNum: { fontSize: 26, flexShrink: 0, width: 34, textAlign: "center" },
