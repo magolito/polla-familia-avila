@@ -204,28 +204,45 @@ const SEED_MATCHES = [
   { id: "g72", group: "J", home: "Jordania", away: "Argentina", date: "Sáb 27 Jun · 10:00 PM" },
 ];
 
-// Eliminatorias desde Octavos (estructura tipo FIFA). Los "equipos" son slots
-// que indican de dónde viene cada uno (ganador de grupo, o ganador de cruce previo).
-// home/away son las etiquetas que se muestran hasta que el admin ponga el equipo real.
+// Eliminatorias desde Dieciseisavos (Ronda de 32, estructura FIFA 2026).
+// Los "equipos" son slots: 1ºX/2ºX se autocompletan al terminar el grupo;
+// los terceros (3º...) y los "Gana Wxx" los define/confirma el admin.
 const KO_MATCHES = [
-  // Octavos (8)
-  { id: "o1", group: "Octavos", home: "1ºA", away: "3ºC/D/F/G/H", date: "Lun 29 Jun · 3:00 PM" },
-  { id: "o2", group: "Octavos", home: "1ºC", away: "2ºF", date: "Lun 29 Jun · 6:00 PM" },
-  { id: "o3", group: "Octavos", home: "1ºE", away: "3ºA/B/C/D/F", date: "Mar 30 Jun · 3:00 PM" },
-  { id: "o4", group: "Octavos", home: "1ºF", away: "2ºC", date: "Mar 30 Jun · 6:00 PM" },
-  { id: "o5", group: "Octavos", home: "1ºI", away: "3ºC/D/F/G/H", date: "Mié 1 Jul · 3:00 PM" },
-  { id: "o6", group: "Octavos", home: "2ºA", away: "2ºB", date: "Mié 1 Jul · 6:00 PM" },
-  { id: "o7", group: "Octavos", home: "1ºK", away: "3ºD/E/I/J/L", date: "Jue 2 Jul · 3:00 PM" },
-  { id: "o8", group: "Octavos", home: "1ºL", away: "2ºH", date: "Jue 2 Jul · 6:00 PM" },
-  // Cuartos (4)
-  { id: "c1", group: "Cuartos", home: "Gana O1", away: "Gana O2", date: "Vie 4 Jul · 3:00 PM" },
-  { id: "c2", group: "Cuartos", home: "Gana O3", away: "Gana O4", date: "Sáb 5 Jul · 3:00 PM" },
-  { id: "c3", group: "Cuartos", home: "Gana O5", away: "Gana O6", date: "Dom 6 Jul · 3:00 PM" },
-  { id: "c4", group: "Cuartos", home: "Gana O7", away: "Gana O8", date: "Lun 7 Jul · 3:00 PM" },
-  // Semifinales (2)
-  { id: "s1", group: "Semifinal", home: "Gana C1", away: "Gana C2", date: "Mié 9 Jul · 3:00 PM" },
-  { id: "s2", group: "Semifinal", home: "Gana C3", away: "Gana C4", date: "Jue 10 Jul · 3:00 PM" },
-  // Tercer puesto y Final
+  // ── Dieciseisavos (Ronda de 32) — 16 partidos ──
+  { id: "d73", group: "Dieciseisavos", home: "1ºA", away: "3ºC/D/F/G/H", date: "Dom 28 Jun · 3:00 PM" },
+  { id: "d74", group: "Dieciseisavos", home: "1ºE", away: "3ºA/B/C/D/F", date: "Lun 29 Jun · 4:30 PM" },
+  { id: "d75", group: "Dieciseisavos", home: "1ºF", away: "2ºC", date: "Lun 29 Jun · 9:00 PM" },
+  { id: "d76", group: "Dieciseisavos", home: "1ºC", away: "2ºF", date: "Mar 30 Jun · 1:00 PM" },
+  { id: "d77", group: "Dieciseisavos", home: "1ºI", away: "3ºC/D/F/G/H", date: "Mar 30 Jun · 5:00 PM" },
+  { id: "d78", group: "Dieciseisavos", home: "2ºE", away: "2ºI", date: "Mar 30 Jun · 1:00 PM" },
+  { id: "d79", group: "Dieciseisavos", home: "1ºD", away: "3ºB/E/F/I/J", date: "Mar 30 Jun · 9:00 PM" },
+  { id: "d80", group: "Dieciseisavos", home: "1ºL", away: "3ºE/H/I/J/K", date: "Mié 1 Jul · 12:00 PM" },
+  { id: "d81", group: "Dieciseisavos", home: "1ºG", away: "3ºA/E/H/I/J", date: "Mié 1 Jul · 8:00 PM" },
+  { id: "d82", group: "Dieciseisavos", home: "2ºK", away: "2ºL", date: "Mié 1 Jul · 4:00 PM" },
+  { id: "d83", group: "Dieciseisavos", home: "1ºH", away: "2ºJ", date: "Jue 2 Jul · 3:00 PM" },
+  { id: "d84", group: "Dieciseisavos", home: "1ºB", away: "3ºE/F/G/I/J", date: "Jue 2 Jul · 7:00 PM" },
+  { id: "d85", group: "Dieciseisavos", home: "1ºJ", away: "2ºH", date: "Vie 3 Jul · 6:00 PM" },
+  { id: "d86", group: "Dieciseisavos", home: "2ºD", away: "2ºG", date: "Vie 3 Jul · 2:00 PM" },
+  { id: "d87", group: "Dieciseisavos", home: "1ºK", away: "3ºD/E/I/J/L", date: "Vie 3 Jul · 10:00 PM" },
+  { id: "d88", group: "Dieciseisavos", home: "2ºA", away: "2ºB", date: "Sáb 4 Jul · 12:00 PM" },
+  // ── Octavos (8) — vienen de los ganadores de dieciseisavos ──
+  { id: "o1", group: "Octavos", home: "Gana D73", away: "Gana D74", date: "Dom 5 Jul · 12:00 PM" },
+  { id: "o2", group: "Octavos", home: "Gana D75", away: "Gana D76", date: "Dom 5 Jul · 4:00 PM" },
+  { id: "o3", group: "Octavos", home: "Gana D77", away: "Gana D78", date: "Lun 6 Jul · 12:00 PM" },
+  { id: "o4", group: "Octavos", home: "Gana D79", away: "Gana D80", date: "Lun 6 Jul · 4:00 PM" },
+  { id: "o5", group: "Octavos", home: "Gana D81", away: "Gana D82", date: "Mar 7 Jul · 12:00 PM" },
+  { id: "o6", group: "Octavos", home: "Gana D83", away: "Gana D84", date: "Mar 7 Jul · 4:00 PM" },
+  { id: "o7", group: "Octavos", home: "Gana D85", away: "Gana D86", date: "Mié 8 Jul · 12:00 PM" },
+  { id: "o8", group: "Octavos", home: "Gana D87", away: "Gana D88", date: "Mié 8 Jul · 4:00 PM" },
+  // ── Cuartos (4) ──
+  { id: "c1", group: "Cuartos", home: "Gana O1", away: "Gana O2", date: "Vie 10 Jul · 3:00 PM" },
+  { id: "c2", group: "Cuartos", home: "Gana O3", away: "Gana O4", date: "Sáb 11 Jul · 3:00 PM" },
+  { id: "c3", group: "Cuartos", home: "Gana O5", away: "Gana O6", date: "Dom 12 Jul · 3:00 PM" },
+  { id: "c4", group: "Cuartos", home: "Gana O7", away: "Gana O8", date: "Lun 13 Jul · 3:00 PM" },
+  // ── Semifinales (2) ──
+  { id: "s1", group: "Semifinal", home: "Gana C1", away: "Gana C2", date: "Mié 15 Jul · 3:00 PM" },
+  { id: "s2", group: "Semifinal", home: "Gana C3", away: "Gana C4", date: "Jue 16 Jul · 3:00 PM" },
+  // ── Tercer puesto y Final ──
   { id: "tp", group: "Tercer puesto", home: "Pierde S1", away: "Pierde S2", date: "Sáb 18 Jul · 3:00 PM" },
   { id: "fin", group: "Final", home: "Gana S1", away: "Gana S2", date: "Dom 19 Jul · 3:00 PM" },
 ];
