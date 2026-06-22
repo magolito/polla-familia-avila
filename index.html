@@ -204,10 +204,38 @@ const SEED_MATCHES = [
   { id: "g72", group: "J", home: "Jordania", away: "Argentina", date: "Sáb 27 Jun · 10:00 PM" },
 ];
 
+// Eliminatorias desde Octavos (estructura tipo FIFA). Los "equipos" son slots
+// que indican de dónde viene cada uno (ganador de grupo, o ganador de cruce previo).
+// home/away son las etiquetas que se muestran hasta que el admin ponga el equipo real.
+const KO_MATCHES = [
+  // Octavos (8)
+  { id: "o1", group: "Octavos", home: "1ºA", away: "3ºC/D/F/G/H", date: "Lun 29 Jun · 3:00 PM" },
+  { id: "o2", group: "Octavos", home: "1ºC", away: "2ºF", date: "Lun 29 Jun · 6:00 PM" },
+  { id: "o3", group: "Octavos", home: "1ºE", away: "3ºA/B/C/D/F", date: "Mar 30 Jun · 3:00 PM" },
+  { id: "o4", group: "Octavos", home: "1ºF", away: "2ºC", date: "Mar 30 Jun · 6:00 PM" },
+  { id: "o5", group: "Octavos", home: "1ºI", away: "3ºC/D/F/G/H", date: "Mié 1 Jul · 3:00 PM" },
+  { id: "o6", group: "Octavos", home: "2ºA", away: "2ºB", date: "Mié 1 Jul · 6:00 PM" },
+  { id: "o7", group: "Octavos", home: "1ºK", away: "3ºD/E/I/J/L", date: "Jue 2 Jul · 3:00 PM" },
+  { id: "o8", group: "Octavos", home: "1ºL", away: "2ºH", date: "Jue 2 Jul · 6:00 PM" },
+  // Cuartos (4)
+  { id: "c1", group: "Cuartos", home: "Gana O1", away: "Gana O2", date: "Vie 4 Jul · 3:00 PM" },
+  { id: "c2", group: "Cuartos", home: "Gana O3", away: "Gana O4", date: "Sáb 5 Jul · 3:00 PM" },
+  { id: "c3", group: "Cuartos", home: "Gana O5", away: "Gana O6", date: "Dom 6 Jul · 3:00 PM" },
+  { id: "c4", group: "Cuartos", home: "Gana O7", away: "Gana O8", date: "Lun 7 Jul · 3:00 PM" },
+  // Semifinales (2)
+  { id: "s1", group: "Semifinal", home: "Gana C1", away: "Gana C2", date: "Mié 9 Jul · 3:00 PM" },
+  { id: "s2", group: "Semifinal", home: "Gana C3", away: "Gana C4", date: "Jue 10 Jul · 3:00 PM" },
+  // Tercer puesto y Final
+  { id: "tp", group: "Tercer puesto", home: "Pierde S1", away: "Pierde S2", date: "Sáb 18 Jul · 3:00 PM" },
+  { id: "fin", group: "Final", home: "Gana S1", away: "Gana S2", date: "Dom 19 Jul · 3:00 PM" },
+];
+
+const ALL_SEED = [...SEED_MATCHES, ...KO_MATCHES];
+
 function PollaMundial() {
   const [players, setPlayers] = useState(DEFAULT_PLAYERS);
   const PLAYERS = players; // alias para usar igual que antes en todo el componente
-  const [matches, setMatches] = useState(SEED_MATCHES);
+  const [matches, setMatches] = useState(ALL_SEED);
   const [predictions, setPredictions] = useState({});
   const [results, setResults] = useState({});
   const [champions, setChampions] = useState({});
@@ -241,7 +269,7 @@ function PollaMundial() {
   const resRef = useRef({}); resRef.current = results;
   const champRef = useRef({}); champRef.current = champions;
   const realChampRef = useRef(""); realChampRef.current = realChampion;
-  const matchesRef = useRef(SEED_MATCHES); matchesRef.current = matches;
+  const matchesRef = useRef(ALL_SEED); matchesRef.current = matches;
   const playersRef = useRef(DEFAULT_PLAYERS); playersRef.current = players;
   const lastPushRef = useRef(0);
   const savingRef = useRef(false);
@@ -443,9 +471,9 @@ function PollaMundial() {
 
   const resyncFixture = async () => {
     if (!confirm("Esto actualizará las fechas y horas de los partidos a las del código (corrige las horas). No borra apuestas ni resultados. ¿Continuar?")) return;
-    const seedIds = new Set(SEED_MATCHES.map((m) => m.id));
+    const seedIds = new Set(ALL_SEED.map((m) => m.id));
     const extras = matches.filter((m) => !seedIds.has(m.id)); // eliminatorias agregadas a mano
-    const next = [...SEED_MATCHES, ...extras];
+    const next = [...ALL_SEED, ...extras];
     matchesRef.current = next; setMatches(next);
     setSaving(true);
     lastPushRef.current = Date.now();
@@ -552,6 +580,30 @@ function PollaMundial() {
     });
     return ranked;
   }, [matches, results]);
+
+  // Resuelve un slot de eliminatoria (ej. "1ºA", "2ºF") al equipo real,
+  // SOLO si ese grupo ya jugó todos sus partidos. Si no, devuelve el slot tal cual.
+  const resolveSlot = useMemo(() => {
+    // contar partidos jugados vs totales por grupo
+    const totalByGroup = {}, playedByGroup = {};
+    matches.forEach((m) => {
+      if (isKO(m.group)) return;
+      totalByGroup[m.group] = (totalByGroup[m.group] || 0) + 1;
+      const r = results[m.id];
+      if (r && r.h != null && r.a != null) playedByGroup[m.group] = (playedByGroup[m.group] || 0) + 1;
+    });
+    return (slot) => {
+      // slot tipo "1ºA" o "2ºF": posición + letra de grupo
+      const m = (slot || "").match(/^([12])º([A-L])$/);
+      if (!m) return slot; // no es un slot de 1º/2º (ej. tercero o "Gana O1") → dejar igual
+      const pos = +m[1], grp = m[2];
+      // solo resolver si el grupo terminó del todo
+      if (!totalByGroup[grp] || playedByGroup[grp] !== totalByGroup[grp]) return slot;
+      const table = groupTables[grp];
+      if (!table || !table[pos - 1]) return slot;
+      return table[pos - 1].team; // 1º = índice 0, 2º = índice 1
+    };
+  }, [matches, results, groupTables]);
 
   const prevExactRef = useRef(null);
   const exactReadyRef = useRef(false);
@@ -906,10 +958,11 @@ function PollaMundial() {
               const pr = predictions[m.id]?.[me] || {}; const res = results[m.id] || {};
               const closed = res.h != null && res.a != null; const locked = isLocked(m);
               const s = scorePrediction(pr, res); const wH = closed && res.h > res.a, wA = closed && res.a > res.h; const count = betCount(m.id);
+              const homeT = resolveSlot(m.home), awayT = resolveSlot(m.away);
               return (
                 <div key={m.id} className="pm-card" style={{ ...S.koGame, ...(isFinal ? S.bracketFinal : {}) }}>
-                  <div style={{ ...S.koTeam, ...(wH ? S.bracketWin : {}) }}><span style={S.koName}>{flag(m.home)} {m.home}</span><input className="pm-inp" type="number" min="0" value={pr.h ?? ""} onChange={(e) => setPred(m.id, "h", e.target.value)} style={S.koInp} disabled={locked} /></div>
-                  <div style={{ ...S.koTeam, ...(wA ? S.bracketWin : {}), borderTop: "1px solid #1a2a4d" }}><span style={S.koName}>{flag(m.away)} {m.away}</span><input className="pm-inp" type="number" min="0" value={pr.a ?? ""} onChange={(e) => setPred(m.id, "a", e.target.value)} style={S.koInp} disabled={locked} /></div>
+                  <div style={{ ...S.koTeam, ...(wH ? S.bracketWin : {}) }}><span style={S.koName}>{flag(homeT)} {homeT}</span><input className="pm-inp" type="number" min="0" value={pr.h ?? ""} onChange={(e) => setPred(m.id, "h", e.target.value)} style={S.koInp} disabled={locked} /></div>
+                  <div style={{ ...S.koTeam, ...(wA ? S.bracketWin : {}), borderTop: "1px solid #1a2a4d" }}><span style={S.koName}>{flag(awayT)} {awayT}</span><input className="pm-inp" type="number" min="0" value={pr.a ?? ""} onChange={(e) => setPred(m.id, "a", e.target.value)} style={S.koInp} disabled={locked} /></div>
                   <div style={S.koMeta}><span>{(m.date || "").split(" · ")[0]}</span>{closed ? <span style={{ color: s === 3 ? "#22c55e" : s === 1 ? "#ffcd00" : "#a85", fontWeight: 700 }}>+{s} · {res.h}-{res.a}</span> : <span>🔒 {count}/{PLAYERS.length}</span>}</div>
                 </div>
               );
