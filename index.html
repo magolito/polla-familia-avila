@@ -31,6 +31,17 @@
   .pm-saved{display:inline-block;animation:savedPop .3s ease-out}
   @keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}
   .pm-live-dot{animation:livePulse 1.2s ease-in-out infinite}
+  @keyframes champGlow{0%,100%{box-shadow:0 0 30px rgba(255,205,0,.25),0 12px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08)}50%{box-shadow:0 0 50px rgba(255,205,0,.45),0 12px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.12)}}
+  .pm-champ-card{animation:champGlow 3.5s ease-in-out infinite;position:relative;overflow:hidden}
+  .pm-champ-card::before{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.13),transparent);transform:skewX(-20deg);animation:sheen 4.5s ease-in-out infinite}
+  @keyframes sheen{0%{left:-60%}35%,100%{left:130%}}
+  @keyframes barGrow{from{width:0}}
+  .pm-barfill{animation:barGrow 1s cubic-bezier(.2,.9,.2,1) both}
+  .pm-lbrow{position:relative;overflow:hidden}
+  .pm-lbrow::after{content:'';position:absolute;left:0;top:0;width:3px;height:100%;background:var(--accent,#27396b)}
+  @keyframes countUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .pm-lbrow,.pm-champ-card{animation-fill-mode:both}
+  .pm-rankrise{animation:countUp .5s ease-out both}
   .gate-btn{transition:transform .15s ease, border-color .15s ease, background .15s ease}
   .gate-btn:hover{transform:translateY(-3px);border-color:#ffcd00;background:#12224a}
 </style>
@@ -184,12 +195,12 @@ const SEED_MATCHES = [
   { id: "g52", group: "C", home: "Escocia", away: "Brasil", date: "Mié 24 Jun · 6:00 PM" },
   { id: "g53", group: "A", home: "Sudáfrica", away: "Corea del Sur", date: "Mié 24 Jun · 9:00 PM" },
   { id: "g54", group: "A", home: "Chequia", away: "México", date: "Mié 24 Jun · 9:00 PM" },
-  { id: "g55", group: "E", home: "Curazao", away: "Costa de Marfil", date: "Jue 25 Jun · 5:00 PM" },
-  { id: "g56", group: "E", home: "Ecuador", away: "Alemania", date: "Jue 25 Jun · 5:00 PM" },
-  { id: "g57", group: "F", home: "Túnez", away: "Países Bajos", date: "Jue 25 Jun · 8:00 PM" },
-  { id: "g58", group: "F", home: "Japón", away: "Suecia", date: "Jue 25 Jun · 8:00 PM" },
-  { id: "g59", group: "D", home: "Turquía", away: "EEUU", date: "Jue 25 Jun · 11:00 PM" },
-  { id: "g60", group: "D", home: "Paraguay", away: "Australia", date: "Jue 25 Jun · 11:00 PM" },
+  { id: "g55", group: "E", home: "Curazao", away: "Costa de Marfil", date: "Jue 25 Jun · 4:00 PM" },
+  { id: "g56", group: "E", home: "Ecuador", away: "Alemania", date: "Jue 25 Jun · 4:00 PM" },
+  { id: "g57", group: "F", home: "Túnez", away: "Países Bajos", date: "Jue 25 Jun · 7:00 PM" },
+  { id: "g58", group: "F", home: "Japón", away: "Suecia", date: "Jue 25 Jun · 7:00 PM" },
+  { id: "g59", group: "D", home: "Turquía", away: "EEUU", date: "Jue 25 Jun · 10:00 PM" },
+  { id: "g60", group: "D", home: "Paraguay", away: "Australia", date: "Jue 25 Jun · 10:00 PM" },
   { id: "g61", group: "I", home: "Noruega", away: "Francia", date: "Vie 26 Jun · 3:00 PM" },
   { id: "g62", group: "I", home: "Senegal", away: "Irak", date: "Vie 26 Jun · 3:00 PM" },
   { id: "g63", group: "H", home: "Cabo Verde", away: "Arabia Saudita", date: "Vie 26 Jun · 8:00 PM" },
@@ -1003,22 +1014,40 @@ function PollaMundial() {
         <div className="pm-rise">
           <p style={S.hint}>Posiciones en vivo. 🎯 rey del exacto · 🔥 racha activa · ⚡ mejor racha · 🏆 acertó el campeón.</p>
           <div style={S.tieNote}>En caso de empate en puntos, va arriba quien tenga <b style={{ color: "#ffcd00" }}>más marcadores exactos</b>; si sigue el empate, más aciertos.</div>
-          {standings.map((row, i) => {
-            const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
-            return (
-              <div key={row.name} className={"pm-card" + (i === 0 ? " pm-leader" : "")} style={{ ...S.standRow, ...(row.name === me ? { borderColor: "#ffcd00" } : {}), ...(i === 0 ? { background: "linear-gradient(100deg,#0a1a3a,#0e1a33)", borderColor: "#06348c" } : {}) }}>
-                <div style={{ ...S.rank, ...(i === 0 ? { background: "#ffcd00", color: "#1a1207", boxShadow: "0 0 16px rgba(212,160,23,.5)" } : {}) }}>{medal || i + 1}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 18 }}>{row.name}{row.name === me && <span style={{ fontSize: 11, color: "#ffcd00", marginLeft: 8 }}>tú</span>}</div>
-                  {champions[row.name] && (row.name === me || now >= CHAMPION_DEADLINE || realChampion) && <div style={S.champPick}>{flag(champions[row.name])} {champions[row.name]}{realChampion && champions[row.name] === realChampion && <span style={{ color: "#22c55e", fontWeight: 700 }}> ✓ +{CHAMPION_PTS}</span>}</div>}
-                  {row.badges.length > 0 && <div style={S.badgeRow}>{row.badges.map((b, j) => <span key={j} title={b.t} style={S.badgeChip}>{b.e}</span>)}</div>}
+          {(() => {
+            return standings.map((row, i) => {
+              const isLeader = i === 0;
+              const isMe = row.name === me;
+              const rankColor = i === 1 ? "#9fb2d8" : i === 2 ? "#c08642" : "#5a6f9e";
+              return (
+                <div key={row.name} className={"pm-rankrise" + (isLeader ? " pm-champ-card" : "")} style={{ ...S.cardRow, ...(isLeader ? S.cardRowLeader : {}), ...(isMe && !isLeader ? { borderColor: "#ffcd00" } : {}), animationDelay: (i * 0.04) + "s" }}>
+                  <div style={S.epicTopRow}>
+                    {isLeader ? (
+                      <div style={S.miniMedal}>🥇</div>
+                    ) : (i === 1 || i === 2) ? (
+                      <div style={S.miniMedal}>{i === 1 ? "🥈" : "🥉"}</div>
+                    ) : (
+                      <div style={{ ...S.miniRank, color: rankColor }}>{i + 1}</div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={S.miniName}>{row.name}{isMe && <span style={S.epicYou}>TÚ</span>}</div>
+                      <div style={{ ...S.epicStatsRow, marginTop: 4 }}>
+                        <span style={S.epicStat}><b style={{ color: "#ffcd00" }}>{row.exact}</b> exactos</span>
+                        <span style={S.epicDot} />
+                        <span style={S.epicStat}><b style={{ color: "#ffcd00" }}>{row.hits}</b> aciertos</span>
+                        {row.streak >= 3 && <><span style={S.epicDot} /><span style={S.epicStat}>racha <b style={{ color: "#ff6b3d" }}>{row.streak}</b></span></>}
+                      </div>
+                    </div>
+                    <div style={S.epicPtsBox}>
+                      <div className={isLeader ? "pm-shine" : ""} style={S.miniPts}>{row.pts}</div>
+                      <div style={S.miniPtsLbl}>PTS</div>
+                    </div>
+                  </div>
+                  {row.badges.length > 0 && <div style={S.miniBadges}>{row.badges.map((b, j) => <span key={j} title={b.t} style={S.badgeChip}>{b.e}</span>)}</div>}
                 </div>
-                <div style={S.statMini}>{row.exact} exactos</div>
-                <div style={S.statMini}>{row.hits} aciertos</div>
-                <div style={S.pts}>{row.pts}<span style={{ fontSize: 11, opacity: .5 }}> pts</span></div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
         </div>
       )}
 
@@ -1182,6 +1211,33 @@ const S = {
   ruleDesc: { fontSize: 12.5, opacity: .7, marginTop: 3, lineHeight: 1.4 },
   rulesNote: { marginTop: 12, background: "#0a1a3a", border: "1px solid #06348c", borderRadius: 12, padding: "12px 16px", fontSize: 13, lineHeight: 1.5, opacity: .85 },
   standRow: { display: "flex", alignItems: "center", gap: 14, background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 14, padding: "14px 18px", marginBottom: 8 },
+  // ── Carta épica del líder ──
+  epicCard: { background: "linear-gradient(135deg,#1a2c54 0%,#11203f 45%,#0c1730 100%)", border: "1.5px solid #ffcd00", borderRadius: 18, padding: "20px 22px", marginBottom: 18 },
+  epicTopRow: { display: "flex", alignItems: "center", gap: 16, position: "relative", zIndex: 1 },
+  epicRankBadge: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: 54, height: 54, borderRadius: 14, background: "linear-gradient(135deg,#ffe65c,#ffcd00)", flexShrink: 0, boxShadow: "0 4px 16px rgba(212,160,23,.4)" },
+  epicRankNum: { fontFamily: "'Anton',sans-serif", fontSize: 30, color: "#1a1207", lineHeight: 1 },
+  epicRankLbl: { fontSize: 7.5, fontWeight: 800, color: "#5a4400", letterSpacing: 1.5, marginTop: 1 },
+  epicAvatar: { width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg,#27396b,#0a1428)", border: "2px solid #ffcd00", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Anton',sans-serif", fontSize: 22, color: "#ffcd00", flexShrink: 0 },
+  epicName: { fontFamily: "'Anton',sans-serif", fontSize: 26, color: "#fff", letterSpacing: .5, lineHeight: 1, display: "flex", alignItems: "center", gap: 10 },
+  epicYou: { fontFamily: "'Archivo',sans-serif", fontSize: 10, fontWeight: 800, color: "#0a1428", background: "#ffcd00", borderRadius: 5, padding: "3px 7px", letterSpacing: .5 },
+  epicStatsRow: { display: "flex", alignItems: "center", gap: 9, marginTop: 7, flexWrap: "wrap" },
+  epicStat: { fontSize: 12.5, color: "#b9c6e2" },
+  epicDot: { width: 3, height: 3, borderRadius: "50%", background: "#5a6f9e", display: "inline-block" },
+  epicPtsBox: { textAlign: "center", flexShrink: 0, paddingLeft: 8 },
+  epicPts: { fontFamily: "'Anton',sans-serif", fontSize: 52, lineHeight: .9 },
+  epicPtsLbl: { fontSize: 9, fontWeight: 800, color: "#8ba0c8", letterSpacing: 2, marginTop: 2 },
+  epicChamp: { marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,205,0,.2)", fontSize: 13, color: "#dbe4f5", display: "flex", alignItems: "center", gap: 8, position: "relative", zIndex: 1 },
+  epicBadges: { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12, position: "relative", zIndex: 1 },
+  epicBadge: { fontSize: 11, fontWeight: 700, color: "#ffd84d", background: "rgba(255,205,0,.1)", border: "1px solid rgba(255,205,0,.28)", borderRadius: 20, padding: "4px 11px" },
+  // ── Filas compactas (mismo estilo que el líder, más pequeñas) ──
+  cardRow: { background: "linear-gradient(135deg,#13234a 0%,#0e1a33 60%,#0c1730 100%)", border: "1px solid #1a2a4d", borderRadius: 14, padding: "13px 16px", marginBottom: 8 },
+  cardRowLeader: { border: "1.5px solid #ffcd00" },
+  miniRank: { fontFamily: "'Anton',sans-serif", fontSize: 26, width: 38, textAlign: "center", flexShrink: 0, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" },
+  miniMedal: { fontSize: 26, width: 38, textAlign: "center", flexShrink: 0, lineHeight: 1 },
+  miniName: { fontFamily: "'Anton',sans-serif", fontSize: 19, color: "#fff", letterSpacing: .3, lineHeight: 1, display: "flex", alignItems: "center", gap: 9 },
+  miniPts: { fontFamily: "'Anton',sans-serif", fontSize: 28, lineHeight: 1, color: "#ffcd00" },
+  miniPtsLbl: { fontSize: 8.5, opacity: .45, fontWeight: 800, letterSpacing: 1.5, marginTop: 2, color: "#8ba0c8" },
+  miniBadges: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8, paddingLeft: 50 },
   tieNote: { fontSize: 12, opacity: .7, background: "#0a1228", border: "1px solid #1a2a4d", borderRadius: 10, padding: "10px 14px", marginBottom: 16, lineHeight: 1.5 },
   champPick: { fontSize: 12, color: "#8ba0c8", marginTop: 3, fontWeight: 700 },
   rank: { width: 32, height: 32, borderRadius: 8, background: "#1a2a4d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontFamily: "'Anton',sans-serif", flexShrink: 0 },
