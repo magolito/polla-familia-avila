@@ -872,71 +872,93 @@ function PollaMundial() {
         </div>
       )}
 
-      {tab === "apostar" && (
+      {tab === "apostar" && (() => {
+        // Fila de apuesta reutilizable (grupos y eliminatorias).
+        const BetRow = (m) => {
+          const homeT = resolveSlot(m.home), awayT = resolveSlot(m.away);
+          const pr = predictions[m.id]?.[me] || {};
+          const res = results[m.id] || {};
+          const closed = res.h != null && res.a != null;
+          const locked = isLocked(m);
+          const s = scorePrediction(pr, res);
+          const wH = closed && res.h > res.a, wA = closed && res.a > res.h;
+          const kick = matchTimestamp(m.date);
+          const dd = kick != null ? new Date(kick).toLocaleString("es", { day: "numeric", month: "short" }) : "";
+          const hh = kick != null ? new Date(kick).toLocaleString("es", { hour: "numeric", minute: "2-digit" }) : "";
+          const saved = pr.h != null && pr.a != null;
+          const isEditing = !!editing[m.id] || (!saved && !locked);
+          const d = draft[m.id] || (isEditing ? pr : {});
+          const draftComplete = (draft[m.id] || pr).h != null && (draft[m.id] || pr).a != null;
+          return (
+            <div key={m.id} style={{ marginBottom: 5 }}>
+              <div className="pm-card" style={S.row}>
+                <div style={S.rowMeta}><span style={S.rowTime}>{dd}</span><span style={{ ...S.rowTime, opacity: .4 }}>{hh}</span></div>
+                <div style={{ ...S.rowTeam, ...(wH ? S.bracketWin : {}) }}><span style={S.rowFlag}>{flag(homeT)}</span><span style={S.rowName}>{homeT}</span></div>
+                <input className="pm-inp" type="number" min="0" value={isEditing ? (d.h ?? "") : (pr.h ?? "")} onChange={(e) => setDraftScore(m.id, "h", e.target.value)} style={{ ...S.rowInp, ...(saved && !isEditing ? S.rowInpSaved : {}) }} disabled={locked || !isEditing} />
+                <span style={S.rowColon}>:</span>
+                <input className="pm-inp" type="number" min="0" value={isEditing ? (d.a ?? "") : (pr.a ?? "")} onChange={(e) => setDraftScore(m.id, "a", e.target.value)} style={{ ...S.rowInp, ...(saved && !isEditing ? S.rowInpSaved : {}) }} disabled={locked || !isEditing} />
+                <div style={{ ...S.rowTeam, justifyContent: "flex-end", textAlign: "right", ...(wA ? S.bracketWin : {}) }}><span style={S.rowName}>{awayT}</span><span style={S.rowFlag}>{flag(awayT)}</span></div>
+                <div style={S.rowAction}>
+                  {locked ? (
+                    closed ? <span style={{ color: s === 3 ? "#22c55e" : s === 1 ? "#ffcd00" : "#a85", fontWeight: 700, fontSize: 10.5 }}>+{s} · {res.h}-{res.a}</span>
+                      : <span style={S.liveTag}><span className="pm-live-dot" style={S.liveDot} />EN VIVO</span>
+                  ) : justSaved[m.id] ? (
+                    <span className="pm-saved" style={S.savedFlash}>✓ ¡Guardado!</span>
+                  ) : isEditing ? (
+                    <button onClick={() => savePred(m.id)} disabled={!draftComplete || savingMatch[m.id]} style={{ ...S.saveBtn, ...(draftComplete && !savingMatch[m.id] ? {} : S.saveBtnOff) }}>{savingMatch[m.id] ? "Guardando…" : "Guardar"}</button>
+                  ) : (
+                    <button onClick={() => editPred(m.id)} style={S.editBtn}>✓ Editar</button>
+                  )}
+                </div>
+              </div>
+              {locked && (
+                <div style={{ marginTop: 4 }}>
+                  <button onClick={() => setExpanded((x) => ({ ...x, [m.id]: !x[m.id] }))} style={S.revealToggle}>
+                    {expanded[m.id] ? "▲ Ocultar apuestas" : `👥 Ver apuestas (${betCount(m.id)})`}
+                  </button>
+                  {expanded[m.id] && (
+                    <div style={S.reveal}>
+                      {PLAYERS.map((p) => {
+                        const pp = predictions[m.id]?.[p]; const has = pp && pp.h != null && pp.a != null; const ps = scorePrediction(pp, res);
+                        return <div key={p} style={{ ...S.revealItem, ...(p === me ? { borderColor: "#ffcd00" } : {}) }}><span style={{ opacity: .8 }}>{p}</span><span style={{ fontWeight: 700 }}>{has ? `${pp.h}-${pp.a}` : "—"}</span>{has && closed && <span style={{ fontSize: 10, color: ps === 3 ? "#22c55e" : ps === 1 ? "#ffcd00" : "#a85", fontWeight: 700 }}>+{ps}</span>}</div>;
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        };
+        // ¿Hay eliminatorias con resultado o ya empezadas? (para mostrar la sección)
+        const koGames = matches.filter((m) => isKO(m.group));
+        const koByRound = KO_ROUNDS.filter((r) => koGames.some((m) => m.group === r)).map((r) => ({ round: r, games: koGames.filter((m) => m.group === r) }));
+        return (
         <div className="pm-rise">
           <p style={S.hint}>Predice el marcador. <b style={{ color: "#ffcd00" }}>3 pts</b> exacto, <b style={{ color: "#ffcd00" }}>1 pt</b> por acertar quién gana. 🕐 Horas en <b>tu hora local</b>. La apuesta se cierra para todos al arrancar el partido y ahí se revelan todas.</p>
+          {koByRound.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ ...S.dateLabel, color: "#ffcd00", fontSize: 22 }}>⚔️ ELIMINATORIAS</div>
+              <p style={{ fontSize: 12.5, opacity: .65, marginBottom: 16 }}>Marcador de los <b>90 minutos</b> (sin tiempo extra ni penaltis). Los equipos aparecen cuando se definen los cruces.</p>
+              {koByRound.map(({ round, games }) => (
+                <div key={round} style={{ marginBottom: 22 }}>
+                  <div style={S.dateLabel}>{round}</div>
+                  {games.map((m) => BetRow(m))}
+                </div>
+              ))}
+              <div style={{ borderTop: "2px solid #27396b", paddingTop: 20, marginTop: 6, marginBottom: 6 }}>
+                <div style={{ ...S.dateLabel, fontSize: 22 }}>🌎 FASE DE GRUPOS</div>
+              </div>
+            </div>
+          )}
           {Object.entries(grouped).filter(([grp]) => !isKO(grp)).map(([grp, ms]) => (
             <div key={grp} style={{ marginBottom: 22 }}>
               <div style={S.dateLabel}>Grupo {grp}</div>
-              {ms.map((m) => {
-                const pr = predictions[m.id]?.[me] || {};
-                const res = results[m.id] || {};
-                const closed = res.h != null && res.a != null;
-                const locked = isLocked(m), started = hasStarted(m);
-                const s = scorePrediction(pr, res);
-                const count = betCount(m.id);
-                const wH = closed && res.h > res.a, wA = closed && res.a > res.h;
-                const kick = matchTimestamp(m.date);
-                const dd = kick != null ? new Date(kick).toLocaleString("es", { day: "numeric", month: "short" }) : "";
-                const hh = kick != null ? new Date(kick).toLocaleString("es", { hour: "numeric", minute: "2-digit" }) : "";
-                const saved = pr.h != null && pr.a != null;        // ya tengo predicción guardada
-                const isEditing = !!editing[m.id] || (!saved && !locked); // edito si: di click en editar, o aún no he guardado
-                const d = draft[m.id] || (isEditing ? pr : {});    // valores a mostrar en los inputs
-                const draftComplete = (draft[m.id] || pr).h != null && (draft[m.id] || pr).a != null;
-                return (
-                  <div key={m.id} style={{ marginBottom: 5 }}>
-                    <div className="pm-card" style={S.row}>
-                      <div style={S.rowMeta}><span style={S.rowTime}>{dd}</span><span style={{ ...S.rowTime, opacity: .4 }}>{hh}</span></div>
-                      <div style={{ ...S.rowTeam, ...(wH ? S.bracketWin : {}) }}><span style={S.rowFlag}>{flag(m.home)}</span><span style={S.rowName}>{m.home}</span></div>
-                      <input className="pm-inp" type="number" min="0" value={isEditing ? (d.h ?? "") : (pr.h ?? "")} onChange={(e) => setDraftScore(m.id, "h", e.target.value)} style={{ ...S.rowInp, ...(saved && !isEditing ? S.rowInpSaved : {}) }} disabled={locked || !isEditing} />
-                      <span style={S.rowColon}>:</span>
-                      <input className="pm-inp" type="number" min="0" value={isEditing ? (d.a ?? "") : (pr.a ?? "")} onChange={(e) => setDraftScore(m.id, "a", e.target.value)} style={{ ...S.rowInp, ...(saved && !isEditing ? S.rowInpSaved : {}) }} disabled={locked || !isEditing} />
-                      <div style={{ ...S.rowTeam, justifyContent: "flex-end", textAlign: "right", ...(wA ? S.bracketWin : {}) }}><span style={S.rowName}>{m.away}</span><span style={S.rowFlag}>{flag(m.away)}</span></div>
-                      <div style={S.rowAction}>
-                        {locked ? (
-                          closed ? <span style={{ color: s === 3 ? "#22c55e" : s === 1 ? "#ffcd00" : "#a85", fontWeight: 700, fontSize: 10.5 }}>+{s} · {res.h}-{res.a}</span>
-                            : <span style={S.liveTag}><span className="pm-live-dot" style={S.liveDot} />EN VIVO</span>
-                        ) : justSaved[m.id] ? (
-                          <span className="pm-saved" style={S.savedFlash}>✓ ¡Guardado!</span>
-                        ) : isEditing ? (
-                          <button onClick={() => savePred(m.id)} disabled={!draftComplete || savingMatch[m.id]} style={{ ...S.saveBtn, ...(draftComplete && !savingMatch[m.id] ? {} : S.saveBtnOff) }}>{savingMatch[m.id] ? "Guardando…" : "Guardar"}</button>
-                        ) : (
-                          <button onClick={() => editPred(m.id)} style={S.editBtn}>✓ Editar</button>
-                        )}
-                      </div>
-                    </div>
-                    {locked && (
-                      <div style={{ marginTop: 4 }}>
-                        <button onClick={() => setExpanded((x) => ({ ...x, [m.id]: !x[m.id] }))} style={S.revealToggle}>
-                          {expanded[m.id] ? "▲ Ocultar apuestas" : `👥 Ver apuestas (${betCount(m.id)})`}
-                        </button>
-                        {expanded[m.id] && (
-                          <div style={S.reveal}>
-                            {PLAYERS.map((p) => {
-                              const pp = predictions[m.id]?.[p]; const has = pp && pp.h != null && pp.a != null; const ps = scorePrediction(pp, res);
-                              return <div key={p} style={{ ...S.revealItem, ...(p === me ? { borderColor: "#ffcd00" } : {}) }}><span style={{ opacity: .8 }}>{p}</span><span style={{ fontWeight: 700 }}>{has ? `${pp.h}-${pp.a}` : "—"}</span>{has && closed && <span style={{ fontSize: 10, color: ps === 3 ? "#22c55e" : ps === 1 ? "#ffcd00" : "#a85", fontWeight: 700 }}>+{ps}</span>}</div>;
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {ms.map((m) => BetRow(m))}
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
 
       {tab === "campeon" && (() => {
         const champClosed = !!realChampion || now >= CHAMPION_DEADLINE;
@@ -984,25 +1006,27 @@ function PollaMundial() {
 
       {tab === "bracket" && (
         <div className="pm-rise">
-          <p style={S.hint}>Llave de eliminatorias. {me === ADMIN ? "Agrégalas desde admin" : "Manuel las irá agregando"} cuando se definan los cruces. Predice el marcador aquí; se revela al terminar cada partido.</p>
+          <p style={S.hint}>Llave del torneo para <b>ver</b> cómo va quedando. Para apostar los cruces, ve a la pestaña <b style={{ color: "#ffcd00" }}>Apostar</b> (sección Eliminatorias).</p>
           {bracket.length === 0 ? (
             <div style={S.bracketEmpty}><div style={{ fontSize: 40, marginBottom: 10 }}>🗝️</div><div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>Todavía no hay eliminatorias</div><div style={{ fontSize: 14, opacity: .65, maxWidth: 380, margin: "0 auto" }}>Aparecerán aquí como llave cuando se agreguen.</div></div>
           ) : (() => {
             const Card = (m, isFinal) => {
               const pr = predictions[m.id]?.[me] || {}; const res = results[m.id] || {};
-              const closed = res.h != null && res.a != null; const locked = isLocked(m);
+              const closed = res.h != null && res.a != null;
               const s = scorePrediction(pr, res); const wH = closed && res.h > res.a, wA = closed && res.a > res.h; const count = betCount(m.id);
               const homeT = resolveSlot(m.home), awayT = resolveSlot(m.away);
+              const myH = pr.h != null ? pr.h : "·", myA = pr.a != null ? pr.a : "·";
               return (
                 <div key={m.id} className="pm-card" style={{ ...S.koGame, ...(isFinal ? S.bracketFinal : {}) }}>
-                  <div style={{ ...S.koTeam, ...(wH ? S.bracketWin : {}) }}><span style={S.koName}>{flag(homeT)} {homeT}</span><input className="pm-inp" type="number" min="0" value={pr.h ?? ""} onChange={(e) => setPred(m.id, "h", e.target.value)} style={S.koInp} disabled={locked} /></div>
-                  <div style={{ ...S.koTeam, ...(wA ? S.bracketWin : {}), borderTop: "1px solid #1a2a4d" }}><span style={S.koName}>{flag(awayT)} {awayT}</span><input className="pm-inp" type="number" min="0" value={pr.a ?? ""} onChange={(e) => setPred(m.id, "a", e.target.value)} style={S.koInp} disabled={locked} /></div>
-                  <div style={S.koMeta}><span>{(m.date || "").split(" · ")[0]}</span>{closed ? <span style={{ color: s === 3 ? "#22c55e" : s === 1 ? "#ffcd00" : "#a85", fontWeight: 700 }}>+{s} · {res.h}-{res.a}</span> : <span>🔒 {count}/{PLAYERS.length}</span>}</div>
+                  <div style={{ ...S.koTeam, ...(wH ? S.bracketWin : {}) }}><span style={S.koName}>{flag(homeT)} {homeT}</span><span style={S.koScoreView}>{closed ? res.h : myH}</span></div>
+                  <div style={{ ...S.koTeam, ...(wA ? S.bracketWin : {}), borderTop: "1px solid #1a2a4d" }}><span style={S.koName}>{flag(awayT)} {awayT}</span><span style={S.koScoreView}>{closed ? res.a : myA}</span></div>
+                  <div style={S.koMeta}><span>{(m.date || "").split(" · ")[0]}</span>{closed ? <span style={{ color: s === 3 ? "#22c55e" : s === 1 ? "#ffcd00" : "#a85", fontWeight: 700 }}>+{s} · {res.h}-{res.a}</span> : <span>{(pr.h != null && pr.a != null) ? "tu apuesta" : "apostar en Apostar"}</span>}</div>
                 </div>
               );
             };
             return (
               <div style={S.koScroll}><div style={S.koTree}>
+                <div style={{ width: "100%", fontSize: 12, opacity: .7, marginBottom: 10, paddingLeft: 4 }}>👁️ Esta es la llave para <b>ver</b> cómo va el torneo. Para <b>apostar</b>, ve a la pestaña <b style={{ color: "#ffcd00" }}>Apostar</b>.</div>
                 {bracket.map(({ round, games }, ri) => (
                   <div key={round} style={S.koTreeCol}>
                     <div style={{ ...S.bracketRoundLabel, fontSize: 12 }}>{round}</div>
@@ -1291,6 +1315,7 @@ const S = {
   koTeam: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 500, padding: "6px 8px" },
   koName: { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   koInp: { width: 26, height: 24, textAlign: "center", fontSize: 12, fontWeight: 700, background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 5, fontFamily: "inherit", flexShrink: 0 },
+  koScoreView: { width: 26, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#ffcd00", flexShrink: 0 },
   koMeta: { display: "flex", justifyContent: "space-between", fontSize: 9, opacity: .65, padding: "3px 8px", borderTop: "1px solid #1a2a4d", background: "#0a1228" },
   koChampBox: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", textAlign: "center", padding: "16px 8px", background: "linear-gradient(160deg,#0a1a3a,#0a1228)", border: "1px solid #06348c", borderRadius: 12 },
   adminToggle: { marginTop: 32, background: "transparent", color: "#8ba0c8", border: "1px dashed #27396b", borderRadius: 10, padding: "10px 16px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 700 },
