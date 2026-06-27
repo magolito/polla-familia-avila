@@ -693,6 +693,12 @@ function PollaMundial() {
     setNewM({ group: newM.group, home: "", away: "", date: "" });
   };
   const delMatch = (id) => saveMatches(matches.filter((m) => m.id !== id));
+  // Editar el nombre del equipo (home/away) de un cruce de eliminatoria.
+  // Sirve para poner los terceros reales o el ganador que avanza.
+  const setKOTeam = (matchId, side, name) => {
+    const next = matches.map((m) => m.id === matchId ? { ...m, [side]: name } : m);
+    saveMatches(next);
+  };
 
   if (loading) return <div style={{ ...S.wrap, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", color: "#ffcd00" }}>Cargando la polla…</div>;
 
@@ -1120,6 +1126,23 @@ function PollaMundial() {
             <option value="">— Sin definir —</option>
             {[...new Set(CHAMPION_PICKS)].map((c) => <option key={c} value={c}>{flag(c)} {c}</option>)}
           </select>
+          <h3 style={{ ...S.adminH, marginTop: 24 }}>🗝️ Definir equipos del bracket</h3>
+          <p style={{ fontSize: 11.5, opacity: .65, margin: "0 0 12px" }}>Los 1º y 2º de grupo se llenan solos. Aquí pones los <b>terceros</b> y los <b>ganadores que avanzan</b>. Elige el país real para cada lado del cruce.</p>
+          {matches.filter((m) => isKO(m.group)).map((m) => (
+            <div key={m.id} style={S.koEditRow}>
+              <span style={S.koEditPhase}>{m.group.slice(0, 3)}</span>
+              <select value={CHAMPION_PICKS.includes(m.home) ? m.home : ""} onChange={(e) => setKOTeam(m.id, "home", e.target.value || m.home)} style={S.koEditSel}>
+                <option value="">{m.home}</option>
+                {[...new Set(CHAMPION_PICKS)].sort().map((c) => <option key={c} value={c}>{flag(c)} {c}</option>)}
+              </select>
+              <span style={{ opacity: .4, fontSize: 11 }}>vs</span>
+              <select value={CHAMPION_PICKS.includes(m.away) ? m.away : ""} onChange={(e) => setKOTeam(m.id, "away", e.target.value || m.away)} style={S.koEditSel}>
+                <option value="">{m.away}</option>
+                {[...new Set(CHAMPION_PICKS)].sort().map((c) => <option key={c} value={c}>{flag(c)} {c}</option>)}
+              </select>
+            </div>
+          ))}
+
           <h3 style={{ ...S.adminH, marginTop: 24 }}>Agregar partido (eliminatorias)</h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <input placeholder="Fase (Octavos, Cuartos, Final…)" value={newM.group} onChange={(e) => setNewM({ ...newM, group: e.target.value })} style={S.adminText} />
@@ -1277,6 +1300,9 @@ const S = {
   adminInp: { width: 38, height: 32, textAlign: "center", background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 6, fontFamily: "inherit" },
   adminText: { background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 },
   delBtn: { background: "transparent", color: "#a85", border: "none", fontSize: 11, cursor: "pointer", fontFamily: "inherit" },
+  koEditRow: { display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #16264a" },
+  koEditPhase: { fontSize: 9, fontWeight: 700, color: "#8ba0c8", width: 28, flexShrink: 0, textTransform: "uppercase" },
+  koEditSel: { flex: 1, minWidth: 0, background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 7, padding: "7px 8px", fontFamily: "inherit", fontSize: 12 },
   addBtn: { background: "#ffcd00", color: "#0a1428", border: "none", borderRadius: 8, padding: "9px 16px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   playerChips: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   resyncBox: { display: "flex", alignItems: "center", gap: 12, background: "#0a1428", border: "1px solid #27396b", borderRadius: 10, padding: "12px 14px", marginBottom: 18 },
