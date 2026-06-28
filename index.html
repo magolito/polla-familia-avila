@@ -260,6 +260,32 @@ const KO_MATCHES = [
 
 const ALL_SEED = [...SEED_MATCHES, ...KO_MATCHES];
 
+// Mapa de avance del bracket: cada cruce KO dice a qué partido y lado (home/away)
+// avanza su GANADOR, y a dónde va el PERDEDOR (solo para semis → tercer puesto).
+// Basado en la estructura oficial FIFA 2026 definida en KO_MATCHES.
+const ADVANCE = {
+  // Dieciseisavos → Octavos
+  d73: { win: ["o1", "home"] }, d76: { win: ["o1", "away"] },
+  d75: { win: ["o2", "home"] }, d78: { win: ["o2", "away"] },
+  d74: { win: ["o3", "home"] }, d77: { win: ["o3", "away"] },
+  d79: { win: ["o4", "home"] }, d80: { win: ["o4", "away"] },
+  d83: { win: ["o5", "home"] }, d84: { win: ["o5", "away"] },
+  d82: { win: ["o6", "home"] }, d81: { win: ["o6", "away"] },
+  d86: { win: ["o7", "home"] }, d85: { win: ["o7", "away"] },
+  d87: { win: ["o8", "home"] }, d88: { win: ["o8", "away"] },
+  // Octavos → Cuartos
+  o1: { win: ["c1", "home"] }, o2: { win: ["c1", "away"] },
+  o3: { win: ["c2", "home"] }, o4: { win: ["c2", "away"] },
+  o5: { win: ["c3", "home"] }, o6: { win: ["c3", "away"] },
+  o7: { win: ["c4", "home"] }, o8: { win: ["c4", "away"] },
+  // Cuartos → Semis
+  c1: { win: ["s1", "home"] }, c2: { win: ["s1", "away"] },
+  c3: { win: ["s2", "home"] }, c4: { win: ["s2", "away"] },
+  // Semis → Final (ganador) y Tercer puesto (perdedor)
+  s1: { win: ["fin", "home"], lose: ["tp", "home"] },
+  s2: { win: ["fin", "away"], lose: ["tp", "away"] },
+};
+
 function PollaMundial() {
   const [players, setPlayers] = useState(DEFAULT_PLAYERS);
   const PLAYERS = players; // alias para usar igual que antes en todo el componente
@@ -471,8 +497,37 @@ function PollaMundial() {
   const setResult = (matchId, side, val) => {
     const v = val === "" ? null : Math.min(99, Math.max(0, parseInt(val) || 0));
     const cur = results[matchId] || {};
-    const next = { ...results, [matchId]: { ...cur, [side]: v } };
-    resRef.current = next; setResults(next); queueSave();
+    const newRes = { ...cur, [side]: v };
+    let next = { ...results, [matchId]: newRes };
+    resRef.current = next; setResults(next);
+
+    // Auto-avance del bracket: si es un partido KO con ambos marcadores y ganador claro,
+    // poner el ganador (y perdedor en semis) en la siguiente ronda.
+    const m = matches.find((x) => x.id === matchId);
+    if (m && isKO(m.group) && ADVANCE[matchId] && newRes.h != null && newRes.a != null && newRes.h !== newRes.a) {
+      const homeT = resolveSlot(m.home), awayT = resolveSlot(m.away);
+      const winner = newRes.h > newRes.a ? homeT : awayT;
+      const loser = newRes.h > newRes.a ? awayT : homeT;
+      const adv = ADVANCE[matchId];
+      let nextMatches = matches;
+      if (adv.win) nextMatches = nextMatches.map((x) => x.id === adv.win[0] ? { ...x, [adv.win[1]]: winner } : x);
+      if (adv.lose) nextMatches = nextMatches.map((x) => x.id === adv.lose[0] ? { ...x, [adv.lose[1]]: loser } : x);
+      matchesRef.current = nextMatches; setMatches(nextMatches);
+    }
+    queueSave();
+  };
+  // Avanzar manualmente al ganador (cuando el partido KO quedó empatado y se definió por penaltis).
+  const advanceWinner = (matchId, winner) => {
+    const adv = ADVANCE[matchId];
+    if (!adv) return;
+    const m = matches.find((x) => x.id === matchId);
+    const homeT = resolveSlot(m.home), awayT = resolveSlot(m.away);
+    const loser = winner === homeT ? awayT : homeT;
+    let nextMatches = matches;
+    if (adv.win) nextMatches = nextMatches.map((x) => x.id === adv.win[0] ? { ...x, [adv.win[1]]: winner } : x);
+    if (adv.lose) nextMatches = nextMatches.map((x) => x.id === adv.lose[0] ? { ...x, [adv.lose[1]]: loser } : x);
+    matchesRef.current = nextMatches; setMatches(nextMatches); queueSave();
+    alert(`✓ ${winner} avanza a la siguiente ronda.`);
   };
   const saveChampions = (c) => {
     if (Date.now() >= CHAMPION_DEADLINE || realChampion) return; // cerrado: no se puede cambiar
@@ -1133,15 +1188,25 @@ function PollaMundial() {
           )}
 
           <h3 style={{ ...S.adminH, marginTop: 24 }}>Cargar resultados oficiales</h3>
+          <p style={{ fontSize: 11.5, opacity: .65, margin: "0 0 10px" }}>Al cargar un resultado de eliminatoria con ganador, el equipo pasa solo a la siguiente ronda. Si quedan empatados (penaltis), elige abajo quién avanzó.</p>
           {matches.map((m) => {
             const res = results[m.id] || {};
+            const homeT = resolveSlot(m.home), awayT = resolveSlot(m.away);
+            const koTie = isKO(m.group) && ADVANCE[m.id] && res.h != null && res.a != null && res.h === res.a;
             return (
-              <div key={m.id} style={S.adminRow}>
-                <span style={{ flex: 1, fontSize: 13 }}>{flag(m.home)} {m.home} vs {m.away} {flag(m.away)}</span>
+              <div key={m.id} style={{ ...S.adminRow, flexWrap: "wrap" }}>
+                <span style={{ flex: 1, fontSize: 13, minWidth: 160 }}>{flag(homeT)} {homeT} vs {awayT} {flag(awayT)}</span>
                 <input className="pm-inp" type="number" min="0" value={res.h ?? ""} onChange={(e) => setResult(m.id, "h", e.target.value)} style={S.adminInp} />
                 <span style={{ opacity: .5 }}>:</span>
                 <input className="pm-inp" type="number" min="0" value={res.a ?? ""} onChange={(e) => setResult(m.id, "a", e.target.value)} style={S.adminInp} />
-                {isKO(m.group) && <button onClick={() => delMatch(m.id)} style={S.delBtn}>borrar</button>}
+                {isKO(m.group) && !ADVANCE[m.id] && <button onClick={() => delMatch(m.id)} style={S.delBtn}>borrar</button>}
+                {koTie && (
+                  <div style={{ width: "100%", display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                    <span style={{ fontSize: 11, color: "#ffcd00" }}>🥅 Pasó (penaltis):</span>
+                    <button onClick={() => advanceWinner(m.id, homeT)} style={S.tieBtn}>{homeT}</button>
+                    <button onClick={() => advanceWinner(m.id, awayT)} style={S.tieBtn}>{awayT}</button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1325,6 +1390,7 @@ const S = {
   adminInp: { width: 38, height: 32, textAlign: "center", background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 6, fontFamily: "inherit" },
   adminText: { background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 },
   delBtn: { background: "transparent", color: "#a85", border: "none", fontSize: 11, cursor: "pointer", fontFamily: "inherit" },
+  tieBtn: { background: "#16264a", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   koEditRow: { display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #16264a" },
   koEditPhase: { fontSize: 9, fontWeight: 700, color: "#8ba0c8", width: 28, flexShrink: 0, textTransform: "uppercase" },
   koEditSel: { flex: 1, minWidth: 0, background: "#0a1428", color: "#eef4ff", border: "1px solid #27396b", borderRadius: 7, padding: "7px 8px", fontFamily: "inherit", fontSize: 12 },
