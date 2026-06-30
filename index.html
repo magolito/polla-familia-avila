@@ -321,12 +321,38 @@ function PollaMundial() {
 
   // Limpia un valor de marcador: entero entre 0 y 99, o null.
   const cleanScore = (v) => (v == null || v === "" || isNaN(v)) ? null : Math.min(99, Math.max(0, Math.floor(+v)));
+  // Migración: las eliminatorias cambiaron de IDs (d**, o*, c*, s*, tp, fin) a la
+  // numeración oficial FIFA (m73-m104). Reconectamos apuestas/resultados viejos por equipos.
+  const KO_ID_MIGRATION = {
+    d73: "m73", d74: "m76", d75: "m74", d76: "m75", d77: "m78", d78: "m77",
+    d79: "m79", d80: "m80", d81: "m81", d82: "m82", d83: "m84", d84: "m83",
+    d85: "m85", d86: "m88", d87: "m86", d88: "m87",
+  };
+  const migrateIds = (obj) => {
+    if (!obj) return obj;
+    const out = {};
+    for (const id of Object.keys(obj)) {
+      const newId = KO_ID_MIGRATION[id] || id;
+      // Si ya existe data en el id nuevo, fusionar sin pisar lo nuevo
+      if (out[newId]) {
+        if (typeof obj[id] === "object" && !("h" in obj[id])) {
+          // predicciones: objeto de jugadores
+          out[newId] = { ...obj[id], ...out[newId] };
+        }
+      } else {
+        out[newId] = obj[id];
+      }
+    }
+    return out;
+  };
+
   const cleanPreds = (preds) => {
     const out = {};
-    for (const mId of Object.keys(preds || {})) {
+    const src = migrateIds(preds);
+    for (const mId of Object.keys(src || {})) {
       out[mId] = {};
-      for (const pl of Object.keys(preds[mId] || {})) {
-        const x = preds[mId][pl] || {};
+      for (const pl of Object.keys(src[mId] || {})) {
+        const x = src[mId][pl] || {};
         out[mId][pl] = { h: cleanScore(x.h), a: cleanScore(x.a) };
       }
     }
@@ -334,8 +360,9 @@ function PollaMundial() {
   };
   const cleanResults = (rs) => {
     const out = {};
-    for (const mId of Object.keys(rs || {})) {
-      const x = rs[mId] || {};
+    const src = migrateIds(rs);
+    for (const mId of Object.keys(src || {})) {
+      const x = src[mId] || {};
       out[mId] = { h: cleanScore(x.h), a: cleanScore(x.a) };
     }
     return out;
