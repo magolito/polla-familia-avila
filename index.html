@@ -287,6 +287,55 @@ const ADVANCE = {
   m102: { win: ["m104", "away"], lose: ["m103", "away"] },
 };
 
+// Recalcula TODO el bracket desde los resultados existentes: propaga los ganadores
+// (y perdedores en semis) hacia las rondas siguientes. Se ejecuta al cargar para que
+// los partidos ya jugados aparezcan resueltos aunque su resultado se haya cargado antes.
+// Orden de rondas garantiza que cuartos se resuelva después de octavos, etc.
+const RECOMPUTE_ORDER = [
+  "m73","m74","m75","m76","m77","m78","m79","m80","m81","m82","m83","m84","m85","m86","m87","m88",
+  "m89","m90","m91","m92","m93","m94","m95","m96","m97","m98","m99","m100","m101","m102",
+];
+function recomputeBracket(matches, results) {
+  // mapa id→match para resolver slots ("Gana m73" → equipo real)
+  const byId = {};
+  matches.forEach((m) => { byId[m.id] = { ...m }; });
+  const resolve = (name) => {
+    const mm = /^Gana (m\d+)$/.exec(name);
+    if (mm && byId[mm[1]]) {
+      const src = byId[mm[1]], r = results[src.id];
+      if (r && r.h != null && r.a != null && r.h !== r.a) {
+        return r.h > r.a ? resolve(src.home) : resolve(src.away);
+      }
+    }
+    const lm = /^Pierde (m\d+)$/.exec(name);
+    if (lm && byId[lm[1]]) {
+      const src = byId[lm[1]], r = results[src.id];
+      if (r && r.h != null && r.a != null && r.h !== r.a) {
+        return r.h > r.a ? resolve(src.away) : resolve(src.home);
+      }
+    }
+    return name;
+  };
+  let changed = false;
+  for (const id of RECOMPUTE_ORDER) {
+    const adv = ADVANCE[id]; const m = byId[id]; const r = results[id];
+    if (!adv || !m || !r || r.h == null || r.a == null || r.h === r.a) continue;
+    const homeT = resolve(m.home), awayT = resolve(m.away);
+    const winner = r.h > r.a ? homeT : awayT;
+    const loser = r.h > r.a ? awayT : homeT;
+    // Solo avanzar si ya tenemos equipos reales (no "Gana m..")
+    if (adv.win && !/^(Gana|Pierde) m\d+$/.test(winner)) {
+      const [tid, side] = adv.win;
+      if (byId[tid] && byId[tid][side] !== winner) { byId[tid][side] = winner; changed = true; }
+    }
+    if (adv.lose && !/^(Gana|Pierde) m\d+$/.test(loser)) {
+      const [tid, side] = adv.lose;
+      if (byId[tid] && byId[tid][side] !== loser) { byId[tid][side] = loser; changed = true; }
+    }
+  }
+  return { matches: matches.map((m) => byId[m.id] || m), changed };
+}
+
 function PollaMundial() {
   const [players, setPlayers] = useState(DEFAULT_PLAYERS);
   const PLAYERS = players; // alias para usar igual que antes en todo el componente
@@ -416,7 +465,24 @@ function PollaMundial() {
         const { state, matches: mt } = await apiGet();
         if (!active) return;
         applyState(state);
-        if (mt) setMatches(mt);
+        if (mt) {
+          // Limpiar partidos viejos duplicados del bracket (d**, o*, c*, s*, tp, fin)
+          const isOldKO = (id) => /^(d\d+|o\d+|c\d+|s\d+|tp|fin)$/.test(id);
+          let cleaned = mt.filter((m) => !isOldKO(m.id));
+          // Asegurar que estén TODOS los partidos del código (por si faltan en el server)
+          const haveIds = new Set(cleaned.map((m) => m.id));
+          const missing = ALL_SEED.filter((m) => !haveIds.has(m.id));
+          let full = [...cleaned, ...missing];
+          // Propagar ganadores ya cargados hacia las siguientes rondas
+          const resForCompute = cleanResults(state?.results);
+          const rc = recomputeBracket(full, resForCompute);
+          setMatches(rc.matches);
+          matchesRef.current = rc.matches;
+          // Si limpiamos duplicados, faltaban partidos, o avanzó algún equipo, guardar
+          if (cleaned.length !== mt.length || missing.length > 0 || rc.changed) {
+            queueSave();
+          }
+        }
       } catch (e) { console.error(e); setSaveErr(true); }
       setLoading(false);
     })();
@@ -1111,7 +1177,6 @@ function PollaMundial() {
             };
             return (
               <div style={S.koScroll}><div style={S.koTree}>
-                <div style={{ width: "100%", fontSize: 12, opacity: .7, marginBottom: 10, paddingLeft: 4 }}>👁️ Esta es la llave para <b>ver</b> cómo va el torneo. Para <b>apostar</b>, ve a la pestaña <b style={{ color: "#ffcd00" }}>Apostar</b>.</div>
                 {bracket.map(({ round, games }, ri) => (
                   <div key={round} style={S.koTreeCol}>
                     <div style={{ ...S.bracketRoundLabel, fontSize: 12 }}>{round}</div>
@@ -1399,9 +1464,9 @@ const S = {
   bracketRoundLabel: { fontFamily: "'Anton',sans-serif", fontSize: 16, color: "#ffcd00", letterSpacing: 1, textAlign: "center", marginBottom: 14, textTransform: "uppercase" },
   bracketFinal: { border: "1px solid #06348c", background: "linear-gradient(140deg,#0a1a3a,#0e1a33)", boxShadow: "0 0 20px rgba(212,160,23,.18)" },
   bracketWin: { color: "#ffcd00", fontWeight: 800 },
-  koScroll: { overflowX: "auto", paddingBottom: 16, WebkitOverflowScrolling: "touch" },
+  koScroll: { overflowX: "auto", paddingBottom: 16, WebkitOverflowScrolling: "touch", marginLeft: "calc(-1 * clamp(16px,5vw,56px))", marginRight: "calc(-1 * clamp(16px,5vw,56px))", paddingLeft: "clamp(16px,5vw,56px)", paddingRight: "clamp(16px,5vw,56px)" },
   koTree: { display: "flex", gap: 0, minWidth: "min-content", alignItems: "stretch" },
-  koTreeCol: { display: "flex", flexDirection: "column", minWidth: 132, paddingRight: 22 },
+  koTreeCol: { display: "flex", flexDirection: "column", minWidth: 128, paddingRight: 16 },
   koTreeGames: { display: "flex", flexDirection: "column", justifyContent: "space-around", gap: 10, flex: 1 },
   koTreePair: { position: "relative", display: "flex", alignItems: "center" },
   connOut: { position: "absolute", right: -22, top: "50%", width: 22, height: 2, background: "#27396b" },
