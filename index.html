@@ -810,9 +810,27 @@ function PollaMundial() {
   useEffect(() => { exactReadyRef.current = false; }, [me]);
 
   const grouped = useMemo(() => { const g = {}; matches.forEach((m) => { (g[m.group] ||= []).push(m); }); return g; }, [matches]);
+
+  // Bracket visual ordenado como el árbol oficial FIFA (arriba→abajo), para que
+  // cada partido quede alineado entre los dos de la ronda previa que lo alimentan.
   const bracket = useMemo(() => {
+    const VISUAL_ORDER = {
+      Dieciseisavos: ["m73","m75","m74","m77","m81","m82","m84","m83","m76","m78","m79","m80","m85","m87","m86","m88"],
+      Octavos: ["m90","m89","m94","m93","m91","m92","m96","m95"],
+      Cuartos: ["m97","m98","m99","m100"],
+      Semifinal: ["m101","m102"],
+      Final: ["m104"],
+      "Tercer puesto": ["m103"],
+    };
     const byRound = {};
     matches.forEach((m) => { if (isKO(m.group)) (byRound[m.group] ||= []).push(m); });
+    Object.keys(byRound).forEach((r) => {
+      const ord = VISUAL_ORDER[r];
+      if (ord) byRound[r].sort((a, b) => {
+        const ia = ord.indexOf(a.id), ib = ord.indexOf(b.id);
+        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+      });
+    });
     return KO_ROUNDS.filter((r) => byRound[r] && byRound[r].length).map((r) => ({ round: r, games: byRound[r] }));
   }, [matches]);
 
