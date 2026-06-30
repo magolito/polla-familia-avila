@@ -219,43 +219,32 @@ const SEED_MATCHES = [
 // Los "equipos" son slots: 1ºX/2ºX se autocompletan al terminar el grupo;
 // los terceros (3º...) y los "Gana Wxx" los define/confirma el admin.
 const KO_MATCHES = [
-  // ── Dieciseisavos (Ronda de 32) — confirmados oficialmente, hora ET/Orlando ──
-  { id: "d73", group: "Dieciseisavos", home: "Sudáfrica", away: "Canadá", date: "Dom 28 Jun · 3:00 PM" },
-  { id: "d74", group: "Dieciseisavos", home: "Brasil", away: "Japón", date: "Lun 29 Jun · 1:00 PM" },
-  { id: "d75", group: "Dieciseisavos", home: "Alemania", away: "Paraguay", date: "Lun 29 Jun · 4:30 PM" },
-  { id: "d76", group: "Dieciseisavos", home: "Países Bajos", away: "Marruecos", date: "Lun 29 Jun · 9:00 PM" },
-  { id: "d77", group: "Dieciseisavos", home: "Costa de Marfil", away: "Noruega", date: "Mar 30 Jun · 1:00 PM" },
-  { id: "d78", group: "Dieciseisavos", home: "Francia", away: "Suecia", date: "Mar 30 Jun · 5:00 PM" },
-  { id: "d79", group: "Dieciseisavos", home: "México", away: "Ecuador", date: "Mar 30 Jun · 9:00 PM" },
-  { id: "d80", group: "Dieciseisavos", home: "Inglaterra", away: "RD Congo", date: "Mié 1 Jul · 12:00 PM" },
-  { id: "d81", group: "Dieciseisavos", home: "Bélgica", away: "Senegal", date: "Mié 1 Jul · 4:00 PM" },
-  { id: "d82", group: "Dieciseisavos", home: "EEUU", away: "Bosnia", date: "Mié 1 Jul · 8:00 PM" },
-  { id: "d83", group: "Dieciseisavos", home: "España", away: "Austria", date: "Jue 2 Jul · 3:00 PM" },
-  { id: "d84", group: "Dieciseisavos", home: "Portugal", away: "Croacia", date: "Jue 2 Jul · 7:00 PM" },
-  { id: "d85", group: "Dieciseisavos", home: "Suiza", away: "Argelia", date: "Jue 2 Jul · 11:00 PM" },
-  { id: "d86", group: "Dieciseisavos", home: "Australia", away: "Egipto", date: "Vie 3 Jul · 2:00 PM" },
-  { id: "d87", group: "Dieciseisavos", home: "Argentina", away: "Cabo Verde", date: "Vie 3 Jul · 6:00 PM" },
-  { id: "d88", group: "Dieciseisavos", home: "Colombia", away: "Ghana", date: "Vie 3 Jul · 9:30 PM" },
-  // ── Octavos (8) — vienen de los ganadores de dieciseisavos (FIFA: orden oficial) ──
-  { id: "o1", group: "Octavos", home: "Gana D73", away: "Gana D76", date: "Sáb 4 Jul · 1:00 PM" },
-  { id: "o2", group: "Octavos", home: "Gana D75", away: "Gana D78", date: "Sáb 4 Jul · 5:00 PM" },
-  { id: "o3", group: "Octavos", home: "Gana D74", away: "Gana D77", date: "Dom 5 Jul · 4:00 PM" },
-  { id: "o4", group: "Octavos", home: "Gana D79", away: "Gana D80", date: "Dom 5 Jul · 8:00 PM" },
-  { id: "o5", group: "Octavos", home: "Gana D83", away: "Gana D84", date: "Lun 6 Jul · 3:00 PM" },
-  { id: "o6", group: "Octavos", home: "Gana D82", away: "Gana D81", date: "Lun 6 Jul · 7:00 PM" },
-  { id: "o7", group: "Octavos", home: "Gana D86", away: "Gana D85", date: "Mar 7 Jul · 3:00 PM" },
-  { id: "o8", group: "Octavos", home: "Gana D87", away: "Gana D88", date: "Mar 7 Jul · 7:00 PM" },
-  // ── Cuartos (4) ──
-  { id: "c1", group: "Cuartos", home: "Gana O1", away: "Gana O2", date: "Jue 9 Jul · 3:00 PM" },
-  { id: "c2", group: "Cuartos", home: "Gana O3", away: "Gana O4", date: "Vie 10 Jul · 3:00 PM" },
-  { id: "c3", group: "Cuartos", home: "Gana O5", away: "Gana O6", date: "Sáb 11 Jul · 1:00 PM" },
-  { id: "c4", group: "Cuartos", home: "Gana O7", away: "Gana O8", date: "Sáb 11 Jul · 5:00 PM" },
-  // ── Semifinales (2) ──
-  { id: "s1", group: "Semifinal", home: "Gana C1", away: "Gana C2", date: "Mar 14 Jul · 3:00 PM" },
-  { id: "s2", group: "Semifinal", home: "Gana C3", away: "Gana C4", date: "Mié 15 Jul · 3:00 PM" },
-  // ── Tercer puesto y Final ──
-  { id: "tp", group: "Tercer puesto", home: "Pierde S1", away: "Pierde S2", date: "Sáb 18 Jul · 3:00 PM" },
-  { id: "fin", group: "Final", home: "Gana S1", away: "Gana S2", date: "Dom 19 Jul · 3:00 PM" },
+  // ── Dieciseisavos (Ronda de 32) — numeración oficial FIFA M73-M88, hora ET/Orlando ──
+  { id: "m73", group: "Dieciseisavos", home: "Sudáfrica", away: "Canadá", date: "Dom 28 Jun · 3:00 PM" },
+  { id: "m74", group: "Dieciseisavos", home: "Alemania", away: "Paraguay", date: "Lun 29 Jun · 4:30 PM" },
+  { id: "m75", group: "Dieciseisavos", home: "Países Bajos", away: "Marruecos", date: "Lun 29 Jun · 9:00 PM" },
+  { id: "m76", group: "Dieciseisavos", home: "Brasil", away: "Japón", date: "Lun 29 Jun · 1:00 PM" },
+
+  // ── Octavos (M89-M96) — conexiones oficiales FIFA ──
+  { id: "m89", group: "Octavos", home: "Gana m74", away: "Gana m77", date: "Sáb 4 Jul · 5:00 PM" },
+  { id: "m90", group: "Octavos", home: "Gana m73", away: "Gana m75", date: "Sáb 4 Jul · 1:00 PM" },
+  { id: "m91", group: "Octavos", home: "Gana m76", away: "Gana m78", date: "Dom 5 Jul · 4:00 PM" },
+  { id: "m92", group: "Octavos", home: "Gana m79", away: "Gana m80", date: "Dom 5 Jul · 8:00 PM" },
+  { id: "m93", group: "Octavos", home: "Gana m83", away: "Gana m84", date: "Lun 6 Jul · 3:00 PM" },
+  { id: "m94", group: "Octavos", home: "Gana m81", away: "Gana m82", date: "Lun 6 Jul · 8:00 PM" },
+  { id: "m95", group: "Octavos", home: "Gana m86", away: "Gana m88", date: "Mar 7 Jul · 12:00 PM" },
+  { id: "m96", group: "Octavos", home: "Gana m85", away: "Gana m87", date: "Mar 7 Jul · 4:00 PM" },
+  // ── Cuartos (M97-M100) ──
+  { id: "m97", group: "Cuartos", home: "Gana m89", away: "Gana m90", date: "Jue 9 Jul · 4:00 PM" },
+  { id: "m98", group: "Cuartos", home: "Gana m93", away: "Gana m94", date: "Vie 10 Jul · 3:00 PM" },
+  { id: "m99", group: "Cuartos", home: "Gana m91", away: "Gana m92", date: "Sáb 11 Jul · 5:00 PM" },
+  { id: "m100", group: "Cuartos", home: "Gana m95", away: "Gana m96", date: "Sáb 11 Jul · 9:00 PM" },
+  // ── Semifinales (M101-M102) ──
+  { id: "m101", group: "Semifinal", home: "Gana m97", away: "Gana m98", date: "Mar 14 Jul · 3:00 PM" },
+  { id: "m102", group: "Semifinal", home: "Gana m99", away: "Gana m100", date: "Mié 15 Jul · 3:00 PM" },
+  // ── Tercer puesto (M103) y Final (M104) ──
+  { id: "m103", group: "Tercer puesto", home: "Pierde m101", away: "Pierde m102", date: "Sáb 18 Jul · 5:00 PM" },
+  { id: "m104", group: "Final", home: "Gana m101", away: "Gana m102", date: "Dom 19 Jul · 3:00 PM" },
 ];
 
 const ALL_SEED = [...SEED_MATCHES, ...KO_MATCHES];
@@ -264,26 +253,26 @@ const ALL_SEED = [...SEED_MATCHES, ...KO_MATCHES];
 // avanza su GANADOR, y a dónde va el PERDEDOR (solo para semis → tercer puesto).
 // Basado en la estructura oficial FIFA 2026 definida en KO_MATCHES.
 const ADVANCE = {
-  // Dieciseisavos → Octavos
-  d73: { win: ["o1", "home"] }, d76: { win: ["o1", "away"] },
-  d75: { win: ["o2", "home"] }, d78: { win: ["o2", "away"] },
-  d74: { win: ["o3", "home"] }, d77: { win: ["o3", "away"] },
-  d79: { win: ["o4", "home"] }, d80: { win: ["o4", "away"] },
-  d83: { win: ["o5", "home"] }, d84: { win: ["o5", "away"] },
-  d82: { win: ["o6", "home"] }, d81: { win: ["o6", "away"] },
-  d86: { win: ["o7", "home"] }, d85: { win: ["o7", "away"] },
-  d87: { win: ["o8", "home"] }, d88: { win: ["o8", "away"] },
+  // Dieciseisavos → Octavos (conexiones oficiales FIFA)
+  m74: { win: ["m89", "home"] }, m77: { win: ["m89", "away"] },
+  m73: { win: ["m90", "home"] }, m75: { win: ["m90", "away"] },
+  m76: { win: ["m91", "home"] }, m78: { win: ["m91", "away"] },
+  m79: { win: ["m92", "home"] }, m80: { win: ["m92", "away"] },
+  m83: { win: ["m93", "home"] }, m84: { win: ["m93", "away"] },
+  m81: { win: ["m94", "home"] }, m82: { win: ["m94", "away"] },
+  m86: { win: ["m95", "home"] }, m88: { win: ["m95", "away"] },
+  m85: { win: ["m96", "home"] }, m87: { win: ["m96", "away"] },
   // Octavos → Cuartos
-  o1: { win: ["c1", "home"] }, o2: { win: ["c1", "away"] },
-  o3: { win: ["c2", "home"] }, o4: { win: ["c2", "away"] },
-  o5: { win: ["c3", "home"] }, o6: { win: ["c3", "away"] },
-  o7: { win: ["c4", "home"] }, o8: { win: ["c4", "away"] },
+  m89: { win: ["m97", "home"] }, m90: { win: ["m97", "away"] },
+  m93: { win: ["m98", "home"] }, m94: { win: ["m98", "away"] },
+  m91: { win: ["m99", "home"] }, m92: { win: ["m99", "away"] },
+  m95: { win: ["m100", "home"] }, m96: { win: ["m100", "away"] },
   // Cuartos → Semis
-  c1: { win: ["s1", "home"] }, c2: { win: ["s1", "away"] },
-  c3: { win: ["s2", "home"] }, c4: { win: ["s2", "away"] },
+  m97: { win: ["m101", "home"] }, m98: { win: ["m101", "away"] },
+  m99: { win: ["m102", "home"] }, m100: { win: ["m102", "away"] },
   // Semis → Final (ganador) y Tercer puesto (perdedor)
-  s1: { win: ["fin", "home"], lose: ["tp", "home"] },
-  s2: { win: ["fin", "away"], lose: ["tp", "away"] },
+  m101: { win: ["m104", "home"], lose: ["m103", "home"] },
+  m102: { win: ["m104", "away"], lose: ["m103", "away"] },
 };
 
 function PollaMundial() {
