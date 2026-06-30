@@ -569,9 +569,11 @@ function PollaMundial() {
   };
 
   const resyncFixture = async () => {
-    if (!confirm("Esto actualizará las fechas y horas de los partidos a las del código (corrige las horas). No borra apuestas ni resultados. ¿Continuar?")) return;
+    if (!confirm("Esto actualizará las fechas y horas de los partidos a las del código y limpiará partidos viejos duplicados. No borra apuestas ni resultados. ¿Continuar?")) return;
     const seedIds = new Set(ALL_SEED.map((m) => m.id));
-    const extras = matches.filter((m) => !seedIds.has(m.id)); // eliminatorias agregadas a mano
+    // IDs viejos del bracket que deben eliminarse (causaban duplicados)
+    const isOldKO = (id) => /^(d\d+|o\d+|c\d+|s\d+|tp|fin)$/.test(id);
+    const extras = matches.filter((m) => !seedIds.has(m.id) && !isOldKO(m.id)); // solo extras legítimos
     const next = [...ALL_SEED, ...extras];
     matchesRef.current = next; setMatches(next);
     setSaving(true);
@@ -580,7 +582,7 @@ function PollaMundial() {
       await apiPost({ matches: next });
       lastPushRef.current = Date.now();
       setSaveErr(false);
-      alert("✓ Fixture actualizado. Las horas ya quedaron corregidas para todos.");
+      alert("✓ Fixture actualizado y duplicados eliminados. Las horas ya quedaron corregidas para todos.");
     } catch (e) {
       console.error(e); setSaveErr(true);
       alert("⚠️ No se pudo guardar. Revisa tu conexión e intenta de nuevo.");
