@@ -1100,7 +1100,10 @@ function PollaMundial() {
         };
         // ¿Hay eliminatorias con resultado o ya empezadas? (para mostrar la sección)
         const koGames = matches.filter((m) => isKO(m.group));
-        const koByRound = KO_ROUNDS.filter((r) => koGames.some((m) => m.group === r)).map((r) => ({ round: r, games: koGames.filter((m) => m.group === r) }));
+        const koByRound = KO_ROUNDS.filter((r) => koGames.some((m) => m.group === r)).map((r) => ({
+          round: r,
+          games: koGames.filter((m) => m.group === r).sort((a, b) => (matchTimestamp(a.date) || 0) - (matchTimestamp(b.date) || 0)),
+        }));
         return (
         <div className="pm-rise">
           <p style={S.hint}>Predice el marcador. <b style={{ color: "#ffcd00" }}>3 pts</b> exacto, <b style={{ color: "#ffcd00" }}>1 pt</b> por acertar quién gana. 🕐 Horas en <b>tu hora local</b>. La apuesta se cierra para todos al arrancar el partido y ahí se revelan todas.</p>
@@ -1122,7 +1125,7 @@ function PollaMundial() {
           {Object.entries(grouped).filter(([grp]) => !isKO(grp)).map(([grp, ms]) => (
             <div key={grp} style={{ marginBottom: 22 }}>
               <div style={S.dateLabel}>Grupo {grp}</div>
-              {ms.map((m) => BetRow(m))}
+              {[...ms].sort((a, b) => (matchTimestamp(a.date) || 0) - (matchTimestamp(b.date) || 0)).map((m) => BetRow(m))}
             </div>
           ))}
         </div>
