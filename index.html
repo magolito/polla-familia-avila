@@ -35,7 +35,7 @@
   .pm-champ-card{animation:champGlow 3.5s ease-in-out infinite;position:relative;overflow:hidden}
   .pm-champ-card::before{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.13),transparent);transform:skewX(-20deg);animation:sheen 4.5s ease-in-out infinite}
   @keyframes sheen{0%{left:-60%}35%,100%{left:130%}}
-  .pm-wc-banner{animation:wcGlow 3s ease-in-out infinite;position:relative;overflow:hidden}
+  .pm-wc-banner{animation:wcGlow 3s ease-in-out infinite;position:relative;overflow:hidden;background-image:radial-gradient(circle at 20px 20px, rgba(255,205,0,.05) 3px, transparent 4px);background-size:40px 40px}
   @keyframes wcGlow{0%,100%{box-shadow:0 0 34px rgba(255,205,0,.22),0 12px 44px rgba(0,0,0,.5)}50%{box-shadow:0 0 58px rgba(255,205,0,.45),0 12px 44px rgba(0,0,0,.5)}}
   .pm-wc-banner::before{content:'';position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent);transform:skewX(-20deg);animation:sheen 4s ease-in-out infinite;z-index:2}
   .pm-trophy-wc{display:inline-block;animation:wcFloat 3.5s ease-in-out infinite}
@@ -1226,39 +1226,22 @@ function PollaMundial() {
             }
             return (
               <div className="pm-wc-banner" style={S.finalBanner}>
-                {/* patrón modular estilo "26" del Mundial 2026 */}
-                <div style={S.wcPattern} aria-hidden>
-                  <svg width="100%" height="100%" viewBox="0 0 800 300" preserveAspectRatio="xMidYMid slice" style={{ opacity: .05 }}>
-                    <defs>
-                      <pattern id="wc26" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <rect width="40" height="40" fill="none" />
-                        <rect x="0" y="0" width="18" height="18" fill="#ffcd00" />
-                        <path d="M40 0 A20 20 0 0 1 20 20 L20 0 Z" fill="#ffcd00" />
-                        <circle cx="10" cy="30" r="8" fill="none" stroke="#ffcd00" strokeWidth="2" />
-                      </pattern>
-                    </defs>
-                    <rect width="800" height="300" fill="url(#wc26)" />
-                  </svg>
-                </div>
-
                 <div style={S.wcInner}>
                   <div style={S.wcTopRow}>
                     <span style={S.wcYear}>26</span>
+                    <span className="pm-trophy-wc" style={S.wcTrophy}>🏆</span>
                     <div style={S.wcTopText}>
-                      <div style={S.finalBannerGlow}>FIFA WORLD CUP · CANADÁ · MÉXICO · EEUU</div>
+                      <div style={S.finalBannerGlow}>FIFA WORLD CUP 26</div>
                       <div style={S.finalBannerTitle}>{pending.length === 1 && pending[0].group === "Final" ? "LA GRAN FINAL" : "FASE DECISIVA"}</div>
                     </div>
                   </div>
-
-                  <div className="pm-trophy-wc" style={S.wcTrophy}>🏆</div>
-
                   {next && countdown && (
                     <div style={S.finalCountWrap}>
                       <div style={S.finalCountLbl}>{countdown === "¡EN JUEGO!" ? "AHORA" : "ARRANCA EN"} · {nextLabel}</div>
                       <div className="pm-shine" style={S.finalCountNum}>{countdown}</div>
                     </div>
                   )}
-                  <div style={S.finalBannerNote}>🎖️ Clavar el marcador exacto de la <b>FINAL</b> da <b style={{ color: "#ffcd00" }}>+1 punto bonus</b></div>
+                  <div style={S.finalBannerNote}>🎖️ Marcador exacto de la <b>FINAL</b> = <b style={{ color: "#ffcd00" }}>+1 bonus</b></div>
                 </div>
               </div>
             );
@@ -1561,6 +1544,18 @@ const S = {
   navBtnActive: { background: "#ffcd00", color: "#0a1428", boxShadow: "0 4px 14px rgba(212,160,23,.35)" },
   hint: { fontSize: 14, opacity: .7, marginBottom: 20, lineHeight: 1.5 },
 
+  finalBanner: { background: "radial-gradient(120% 140% at 50% 0%, #12224a 0%, #0c1730 55%, #050a12 100%)", border: "1px solid #ffcd00", borderRadius: 14, padding: "14px 18px", marginBottom: 16, textAlign: "center", position: "relative", overflow: "hidden", boxShadow: "0 8px 28px rgba(0,0,0,.45)" },
+  wcInner: { position: "relative", zIndex: 1, maxWidth: 460, margin: "0 auto", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" },
+  wcTopRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap" },
+  wcYear: { fontFamily: "'Anton',sans-serif", fontSize: 30, lineHeight: .8, color: "transparent", WebkitTextStroke: "1.5px #ffcd00", letterSpacing: -1 },
+  wcTopText: { textAlign: "left" },
+  finalBannerGlow: { fontSize: 8, fontWeight: 800, color: "#8ba0c8", letterSpacing: 1.5, marginBottom: 2 },
+  finalBannerTitle: { fontFamily: "'Anton',sans-serif", fontSize: 20, color: "#ffcd00", letterSpacing: .5, lineHeight: .95, textShadow: "0 2px 16px rgba(255,205,0,.4)" },
+  wcTrophy: { fontSize: 24, filter: "drop-shadow(0 4px 12px rgba(255,205,0,.5))" },
+  finalCountWrap: { marginTop: 10, marginBottom: 8, textAlign: "center" },
+  finalCountLbl: { fontSize: 8.5, opacity: .75, letterSpacing: 1, marginBottom: 2, textTransform: "uppercase", fontWeight: 700 },
+  finalCountNum: { fontFamily: "'Anton',sans-serif", fontSize: 26, lineHeight: 1, letterSpacing: .5 },
+  finalBannerNote: { fontSize: 11, opacity: .85, marginTop: 4, paddingTop: 10, borderTop: "1px solid rgba(255,205,0,.2)", textAlign: "center", width: "100%" },
 
   popupOverlay: { position: "fixed", inset: 0, background: "rgba(3,7,16,.82)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
   popupCard: { background: "radial-gradient(120% 130% at 50% 0%, #12224a 0%, #0c1730 55%, #050a12 100%)", border: "1.5px solid #ffcd00", borderRadius: 22, padding: "30px 26px 26px", maxWidth: 380, width: "100%", textAlign: "center", position: "relative", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.6)" },
