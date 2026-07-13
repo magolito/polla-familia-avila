@@ -1228,7 +1228,7 @@ function PollaMundial() {
               <div className="pm-wc-banner" style={S.finalBanner}>
                 {/* patrón modular estilo "26" del Mundial 2026 */}
                 <div style={S.wcPattern} aria-hidden>
-                  <svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" style={{ opacity: .09 }}>
+                  <svg width="100%" height="100%" viewBox="0 0 800 300" preserveAspectRatio="xMidYMid slice" style={{ opacity: .05 }}>
                     <defs>
                       <pattern id="wc26" width="40" height="40" patternUnits="userSpaceOnUse">
                         <rect width="40" height="40" fill="none" />
@@ -1237,7 +1237,7 @@ function PollaMundial() {
                         <circle cx="10" cy="30" r="8" fill="none" stroke="#ffcd00" strokeWidth="2" />
                       </pattern>
                     </defs>
-                    <rect width="400" height="200" fill="url(#wc26)" />
+                    <rect width="800" height="300" fill="url(#wc26)" />
                   </svg>
                 </div>
 
@@ -1561,18 +1561,7 @@ const S = {
   navBtnActive: { background: "#ffcd00", color: "#0a1428", boxShadow: "0 4px 14px rgba(212,160,23,.35)" },
   hint: { fontSize: 14, opacity: .7, marginBottom: 20, lineHeight: 1.5 },
 
-  wcPattern: { position: "absolute", inset: 0, pointerEvents: "none" },
-  wcInner: { position: "relative", zIndex: 1 },
-  wcTopRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 14 },
-  wcYear: { fontFamily: "'Anton',sans-serif", fontSize: 52, lineHeight: .8, color: "transparent", WebkitTextStroke: "2px #ffcd00", letterSpacing: -2 },
-  wcTopText: { textAlign: "left" },
-  finalBannerGlow: { fontSize: 8.5, fontWeight: 800, color: "#8ba0c8", letterSpacing: 1.5, marginBottom: 4 },
-  finalBannerTitle: { fontFamily: "'Anton',sans-serif", fontSize: 30, color: "#ffcd00", letterSpacing: 1, lineHeight: .95, textShadow: "0 2px 24px rgba(255,205,0,.45)" },
-  wcTrophy: { fontSize: 46, marginTop: 10, filter: "drop-shadow(0 6px 20px rgba(255,205,0,.5))" },
-  finalCountWrap: { marginTop: 8, marginBottom: 14 },
-  finalCountLbl: { fontSize: 10, opacity: .75, letterSpacing: 1.5, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 },
-  finalCountNum: { fontFamily: "'Anton',sans-serif", fontSize: 44, lineHeight: 1, letterSpacing: 1 },
-  finalBannerNote: { fontSize: 12, opacity: .9, marginTop: 6, paddingTop: 14, borderTop: "1px solid rgba(255,205,0,.22)" },
+
   popupOverlay: { position: "fixed", inset: 0, background: "rgba(3,7,16,.82)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
   popupCard: { background: "radial-gradient(120% 130% at 50% 0%, #12224a 0%, #0c1730 55%, #050a12 100%)", border: "1.5px solid #ffcd00", borderRadius: 22, padding: "30px 26px 26px", maxWidth: 380, width: "100%", textAlign: "center", position: "relative", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.6)" },
   popupTitle: { fontFamily: "'Anton',sans-serif", fontSize: 26, color: "#ffcd00", letterSpacing: .5, lineHeight: 1.05, marginTop: 12, textShadow: "0 2px 20px rgba(255,205,0,.4)" },
