@@ -804,7 +804,7 @@ function PollaMundial() {
   useEffect(() => {
     if (!me || !inFinalPhase || loading) return;
     let seen = {};
-    try { seen = JSON.parse(localStorage.getItem("polla_final_popup") || "{}"); } catch {}
+    try { seen = JSON.parse(localStorage.getItem("polla_final_popup_v2") || "{}"); } catch {}
     if (seen[me]) return; // ya lo vio esta persona
     const custom = customMessages[me];
     const msg = custom
@@ -812,7 +812,7 @@ function PollaMundial() {
       : (FIXED_MESSAGES[me] || autoMessage(me));
     if (msg) {
       setFinalPopup(msg);
-      try { localStorage.setItem("polla_final_popup", JSON.stringify({ ...seen, [me]: true })); } catch {}
+      try { localStorage.setItem("polla_final_popup_v2", JSON.stringify({ ...seen, [me]: true })); } catch {}
     }
   }, [me, inFinalPhase, loading, customMessages]);
 
@@ -1015,28 +1015,15 @@ function PollaMundial() {
     <div style={S.wrap}>
       {finalPopup && (
         <div style={S.popupOverlay} onClick={() => setFinalPopup(null)}>
-          <div className="pm-wc-banner pm-pop-in" style={S.popupCard} onClick={(e) => e.stopPropagation()}>
-            <div style={S.wcPattern} aria-hidden>
-              <svg width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" style={{ opacity: .08 }}>
-                <defs>
-                  <pattern id="wc26p" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <rect x="0" y="0" width="18" height="18" fill="#ffcd00" />
-                    <path d="M40 0 A20 20 0 0 1 20 20 L20 0 Z" fill="#ffcd00" />
-                    <circle cx="10" cy="30" r="8" fill="none" stroke="#ffcd00" strokeWidth="2" />
-                  </pattern>
-                </defs>
-                <rect width="400" height="300" fill="url(#wc26p)" />
-              </svg>
-            </div>
-            <div style={{ position: "relative", zIndex: 1 }}>
-              <div className="pm-trophy-wc" style={{ fontSize: 52, filter: "drop-shadow(0 6px 20px rgba(255,205,0,.5))" }}>{finalPopup.emoji}</div>
-              <div style={S.popupTitle}>{finalPopup.title}</div>
-              <div style={S.popupBody}>{finalPopup.body}</div>
-              <button onClick={() => setFinalPopup(null)} style={S.popupBtn}>¡VAMOS! 🔥</button>
-            </div>
+          <div className="pm-pop-in" style={S.popupCard} onClick={(e) => e.stopPropagation()}>
+            <div className="pm-trophy-wc" style={{ fontSize: 38 }}>{finalPopup.emoji}</div>
+            <div style={S.popupTitle}>{finalPopup.title}</div>
+            <div style={S.popupBody}>{finalPopup.body}</div>
+            <button onClick={() => setFinalPopup(null)} style={S.popupBtn}>¡VAMOS! 🔥</button>
           </div>
         </div>
-      )}      {confetti && (
+      )}
+      {confetti && (
         <div className="pm-confetti">
           {Array.from({ length: 80 }).map((_, i) => {
             const colors = ["#ffcd00", "#ffe65c", "#01bf50", "#308ff6", "#ec0000", "#ffffff"];
@@ -1571,10 +1558,10 @@ const S = {
   finalBannerNote: { fontSize: 11, opacity: .85, marginTop: 4, paddingTop: 10, borderTop: "1px solid rgba(255,205,0,.2)", textAlign: "center", width: "100%" },
 
   popupOverlay: { position: "fixed", inset: 0, background: "rgba(3,7,16,.82)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
-  popupCard: { background: "radial-gradient(120% 130% at 50% 0%, #12224a 0%, #0c1730 55%, #050a12 100%)", border: "1.5px solid #ffcd00", borderRadius: 22, padding: "30px 26px 26px", maxWidth: 380, width: "100%", textAlign: "center", position: "relative", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.6)" },
-  popupTitle: { fontFamily: "'Anton',sans-serif", fontSize: 26, color: "#ffcd00", letterSpacing: .5, lineHeight: 1.05, marginTop: 12, textShadow: "0 2px 20px rgba(255,205,0,.4)" },
-  popupBody: { fontSize: 14.5, lineHeight: 1.6, color: "#dbe4f5", marginTop: 14 },
-  popupBtn: { marginTop: 22, background: "linear-gradient(135deg,#ffe65c,#ffcd00)", color: "#1a1207", border: "none", borderRadius: 12, padding: "13px 30px", fontSize: 15, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", letterSpacing: .5, boxShadow: "0 6px 20px rgba(255,205,0,.35)" },
+  popupCard: { background: "radial-gradient(120% 130% at 50% 0%, #14254e 0%, #0d1a35 100%)", border: "1px solid #ffcd00", borderRadius: 16, padding: "22px 22px 20px", maxWidth: 300, width: "100%", textAlign: "center", position: "relative", boxShadow: "0 16px 44px rgba(0,0,0,.55), 0 0 30px rgba(255,205,0,.15)" },
+  popupTitle: { fontFamily: "'Anton',sans-serif", fontSize: 20, color: "#ffcd00", letterSpacing: .3, lineHeight: 1.1, marginTop: 8, textShadow: "0 2px 14px rgba(255,205,0,.35)" },
+  popupBody: { fontSize: 14, lineHeight: 1.5, color: "#dbe4f5", marginTop: 10 },
+  popupBtn: { marginTop: 18, background: "linear-gradient(135deg,#ffe65c,#ffcd00)", color: "#1a1207", border: "none", borderRadius: 10, padding: "11px 26px", fontSize: 14, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", letterSpacing: .5, boxShadow: "0 5px 16px rgba(255,205,0,.3)" },
   groupLabel: { fontFamily: "'Anton', sans-serif", fontSize: 22, color: "#ffcd00", letterSpacing: 1, marginBottom: 10 },
   dateLabel: { fontFamily: "'Anton',sans-serif", fontSize: 18, color: "#ffcd00", letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" },
   row: { display: "flex", alignItems: "center", gap: 8, background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 9, padding: "6px 12px" },
