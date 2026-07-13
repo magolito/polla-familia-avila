@@ -35,6 +35,13 @@
   .pm-champ-card{animation:champGlow 3.5s ease-in-out infinite;position:relative;overflow:hidden}
   .pm-champ-card::before{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.13),transparent);transform:skewX(-20deg);animation:sheen 4.5s ease-in-out infinite}
   @keyframes sheen{0%{left:-60%}35%,100%{left:130%}}
+  .pm-wc-banner{animation:wcGlow 3s ease-in-out infinite;position:relative;overflow:hidden}
+  @keyframes wcGlow{0%,100%{box-shadow:0 0 34px rgba(255,205,0,.22),0 12px 44px rgba(0,0,0,.5)}50%{box-shadow:0 0 58px rgba(255,205,0,.45),0 12px 44px rgba(0,0,0,.5)}}
+  .pm-wc-banner::before{content:'';position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent);transform:skewX(-20deg);animation:sheen 4s ease-in-out infinite;z-index:2}
+  .pm-trophy-wc{display:inline-block;animation:wcFloat 3.5s ease-in-out infinite}
+  @keyframes wcFloat{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-8px) rotate(3deg)}}
+  @keyframes popIn{0%{opacity:0;transform:scale(.85) translateY(20px)}100%{opacity:1;transform:none}}
+  .pm-pop-in{animation:popIn .45s cubic-bezier(.2,.9,.3,1.3) both}
   @keyframes barGrow{from{width:0}}
   .pm-barfill{animation:barGrow 1s cubic-bezier(.2,.9,.2,1) both}
   .pm-lbrow{position:relative;overflow:hidden}
@@ -98,7 +105,7 @@ const CHAMPION_PICKS = [
 ];
 const CHAMPION_PTS = 5;
 const FINAL_ID = "m104";        // id de la final
-const FINAL_EXACT_BONUS = 3;    // bonus extra por acertar el marcador EXACTO de la final
+const FINAL_EXACT_BONUS = 1;    // bonus extra por acertar el marcador EXACTO de la final
 // Cierre de la apuesta de campeón: inicio de las eliminatorias (Ronda de 32).
 // 28 jun 2026, 00:00 hora del Este (UTC-4) = 04:00 UTC.
 const CHAMPION_DEADLINE = Date.UTC(2026, 5, 28, 4, 0);
@@ -345,6 +352,7 @@ function PollaMundial() {
   const [predictions, setPredictions] = useState({});
   const [results, setResults] = useState({});
   const [champions, setChampions] = useState({});
+  const [customMessages, setCustomMessages] = useState({}); // mensajes personalizados por jugador (admin)
   const [realChampion, setRealChampion] = useState("");
   const [me, setMe] = useState(() => {
     try { return localStorage.getItem("polla_me") || ""; } catch { return ""; }
@@ -374,6 +382,7 @@ function PollaMundial() {
   const predRef = useRef({}); predRef.current = predictions;
   const resRef = useRef({}); resRef.current = results;
   const champRef = useRef({}); champRef.current = champions;
+  const msgRef = useRef({}); msgRef.current = customMessages;
   const realChampRef = useRef(""); realChampRef.current = realChampion;
   const matchesRef = useRef(ALL_SEED); matchesRef.current = matches;
   const playersRef = useRef(DEFAULT_PLAYERS); playersRef.current = players;
@@ -455,6 +464,7 @@ function PollaMundial() {
     setPredictions(incoming);
     setResults(cleanResults(st.results));
     setChampions(st.champions || {});
+    setCustomMessages(st.custom_messages || {});
     setRealChampion(st.real_champion || "");
     if (Array.isArray(st.players) && st.players.length) setPlayers(st.players);
   };
@@ -506,6 +516,7 @@ function PollaMundial() {
         champions: champRef.current,
         real_champion: realChampRef.current,
         players: playersRef.current,
+        custom_messages: msgRef.current,
       },
       matches: matchesRef.current,
     };
@@ -737,10 +748,60 @@ function PollaMundial() {
       if (r.streak >= 3) r.badges.push({ e: "🔥", t: `Racha de ${r.streak}` });
       if (maxStreak >= 3 && r.bestStreak === maxStreak) r.badges.push({ e: "⚡", t: `Mejor racha (${r.bestStreak})` });
       if (r.champ) r.badges.push({ e: "🏆", t: "Acertó el campeón" });
-      if (r.finalBonus) r.badges.push({ e: "🎖️", t: "Clavó el marcador de la final (+3)" });
+      if (r.finalBonus) r.badges.push({ e: "🎖️", t: "Clavó el marcador de la final (+1)" });
     });
     return arr.sort((a, b) => b.pts - a.pts || b.exact - a.exact || b.hits - a.hits);
   }, [matches, predictions, results, champions, realChampion]);
+
+  // ── Popup personalizado de la recta final (aparece una vez por persona) ──
+  const [finalPopup, setFinalPopup] = useState(null);
+  const inFinalPhase = useMemo(() => {
+    const koDone = !matches.some((m) => ["Dieciseisavos", "Octavos", "Cuartos"].includes(m.group) && !(results[m.id]?.h != null));
+    const hasFinalPhase = matches.some((m) => ["Semifinal", "Final"].includes(m.group));
+    return hasFinalPhase && koDone;
+  }, [matches, results]);
+
+  // Mensajes fijos escritos para personas específicas (recta final).
+  const FIXED_MESSAGES = {
+    "César": { emoji: "👑", title: "¡Vas de LÍDER, César!", body: "La corona es tuya si la defiendes. ¡No te confíes que esto no ha terminado!" },
+    "Daniel": { emoji: "🔥", title: "¡Panita, vas de segundas!", body: "Por solo un punto. ¡Tú puedes con toda, ve por el primer lugar!" },
+    "Carolina": { emoji: "⚡", title: "¡Caro la estás rompiendo!", body: "¡Todavía puedes ganar! No sueltes que vas muy bien." },
+    "Aura": { emoji: "😏", title: "Aja chica, ¡ponte las pilas!", body: "Que ibas muy bien… ¿te vas a dejar de tu hermana? ¡A remontar!" },
+    "Yiyi": { emoji: "🔥", title: "¡Vas súper, Yiyi!", body: "¡Qué buena racha llevas! Sigue así que esto se pone bueno." },
+    "Nicole": { emoji: "💛", title: "¡Vas súper, mi amor!", body: "No bajes la guardia al final, ¡todavía puedes ganar! 😍" },
+    "Ernesto": { emoji: "⚽", title: "¡Buena, un Mbappé!", body: "¡Vas súper bien! Con toda, que esto se decide ahora. 🔥" },
+    "Daniela": { emoji: "💭", title: "¡Daniloo, tú puedes!", body: "¿Escucharás a tu corazón o a tu intuición para estos partidos? ¡A darle!" },
+  };
+
+  const autoMessage = (name) => {
+    const arr = standings;
+    const idx = arr.findIndex((r) => r.name === name);
+    if (idx < 0) return null;
+    const me0 = arr[idx];
+    const total = arr.length;
+    const leaderPts = arr[0]?.pts ?? 0;
+    const gap = leaderPts - me0.pts;
+    if (idx === 0) return { emoji: "👑", title: `¡Vas de LÍDER, ${name}!`, body: `Llegas a la recta final en primer lugar con ${me0.pts} puntos. La corona es tuya… si la defiendes. ¡No te confíes que esto no ha terminado!` };
+    if (idx === 1) return { emoji: "🔥", title: `¡Estás a nada, ${name}!`, body: `Segundo lugar, a solo ${gap} ${gap === 1 ? "punto" : "puntos"} del líder. Un buen resultado en la final y das el golpe. ¡Ve por todo!` };
+    if (idx === 2) return { emoji: "⚡", title: `¡En el podio, ${name}!`, body: `Tercer lugar y con todo para pelear. Estás a ${gap} puntos de la cima. La final puede cambiarlo todo. ¡Concéntrate!` };
+    if (idx >= total - 2) return { emoji: "💪", title: `¡La fe es lo último, ${name}!`, body: `Vas atrás en la tabla, pero en la final todo puede pasar. Clava el marcador exacto y da la sorpresa. ¡Nada está dicho!` };
+    return { emoji: "🎯", title: `¡A darlo todo, ${name}!`, body: `Vas en el puesto ${idx + 1} con ${me0.pts} puntos, a ${gap} del líder. La recta final es tu oportunidad de escalar. ¡Aprovéchala!` };
+  };
+
+  useEffect(() => {
+    if (!me || !inFinalPhase || loading) return;
+    let seen = {};
+    try { seen = JSON.parse(localStorage.getItem("polla_final_popup") || "{}"); } catch {}
+    if (seen[me]) return; // ya lo vio esta persona
+    const custom = customMessages[me];
+    const msg = custom
+      ? { emoji: "💌", title: `Mensaje para ti, ${me}`, body: custom }
+      : (FIXED_MESSAGES[me] || autoMessage(me));
+    if (msg) {
+      setFinalPopup(msg);
+      try { localStorage.setItem("polla_final_popup", JSON.stringify({ ...seen, [me]: true })); } catch {}
+    }
+  }, [me, inFinalPhase, loading, customMessages]);
 
   // Tabla REAL del Mundial por grupo: calcula posición de cada equipo a partir
   // de los resultados oficiales que carga el admin. 3 pts victoria, 1 empate, 0 derrota.
@@ -939,7 +1000,30 @@ function PollaMundial() {
 
   return (
     <div style={S.wrap}>
-      {confetti && (
+      {finalPopup && (
+        <div style={S.popupOverlay} onClick={() => setFinalPopup(null)}>
+          <div className="pm-wc-banner pm-pop-in" style={S.popupCard} onClick={(e) => e.stopPropagation()}>
+            <div style={S.wcPattern} aria-hidden>
+              <svg width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" style={{ opacity: .08 }}>
+                <defs>
+                  <pattern id="wc26p" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <rect x="0" y="0" width="18" height="18" fill="#ffcd00" />
+                    <path d="M40 0 A20 20 0 0 1 20 20 L20 0 Z" fill="#ffcd00" />
+                    <circle cx="10" cy="30" r="8" fill="none" stroke="#ffcd00" strokeWidth="2" />
+                  </pattern>
+                </defs>
+                <rect width="400" height="300" fill="url(#wc26p)" />
+              </svg>
+            </div>
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <div className="pm-trophy-wc" style={{ fontSize: 52, filter: "drop-shadow(0 6px 20px rgba(255,205,0,.5))" }}>{finalPopup.emoji}</div>
+              <div style={S.popupTitle}>{finalPopup.title}</div>
+              <div style={S.popupBody}>{finalPopup.body}</div>
+              <button onClick={() => setFinalPopup(null)} style={S.popupBtn}>¡VAMOS! 🔥</button>
+            </div>
+          </div>
+        </div>
+      )}      {confetti && (
         <div className="pm-confetti">
           {Array.from({ length: 80 }).map((_, i) => {
             const colors = ["#ffcd00", "#ffe65c", "#01bf50", "#308ff6", "#ec0000", "#ffffff"];
@@ -1141,16 +1225,41 @@ function PollaMundial() {
               } else countdown = "¡EN JUEGO!";
             }
             return (
-              <div className="pm-champ-card" style={S.finalBanner}>
-                <div style={S.finalBannerGlow}>🔥 RECTA FINAL 🔥</div>
-                <div style={S.finalBannerTitle}>{pending.length === 1 && pending[0].group === "Final" ? "¡LA GRAN FINAL!" : "FASE DECISIVA"}</div>
-                {next && countdown && (
-                  <div style={S.finalCountWrap}>
-                    <div style={S.finalCountLbl}>Próximo · {nextLabel}</div>
-                    <div className="pm-shine" style={S.finalCountNum}>{countdown}</div>
+              <div className="pm-wc-banner" style={S.finalBanner}>
+                {/* patrón modular estilo "26" del Mundial 2026 */}
+                <div style={S.wcPattern} aria-hidden>
+                  <svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" style={{ opacity: .09 }}>
+                    <defs>
+                      <pattern id="wc26" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <rect width="40" height="40" fill="none" />
+                        <rect x="0" y="0" width="18" height="18" fill="#ffcd00" />
+                        <path d="M40 0 A20 20 0 0 1 20 20 L20 0 Z" fill="#ffcd00" />
+                        <circle cx="10" cy="30" r="8" fill="none" stroke="#ffcd00" strokeWidth="2" />
+                      </pattern>
+                    </defs>
+                    <rect width="400" height="200" fill="url(#wc26)" />
+                  </svg>
+                </div>
+
+                <div style={S.wcInner}>
+                  <div style={S.wcTopRow}>
+                    <span style={S.wcYear}>26</span>
+                    <div style={S.wcTopText}>
+                      <div style={S.finalBannerGlow}>FIFA WORLD CUP · CANADÁ · MÉXICO · EEUU</div>
+                      <div style={S.finalBannerTitle}>{pending.length === 1 && pending[0].group === "Final" ? "LA GRAN FINAL" : "FASE DECISIVA"}</div>
+                    </div>
                   </div>
-                )}
-                <div style={S.finalBannerNote}>🎖️ Acertar el marcador exacto de la FINAL da <b style={{ color: "#ffcd00" }}>+3 puntos bonus</b></div>
+
+                  <div className="pm-trophy-wc" style={S.wcTrophy}>🏆</div>
+
+                  {next && countdown && (
+                    <div style={S.finalCountWrap}>
+                      <div style={S.finalCountLbl}>{countdown === "¡EN JUEGO!" ? "AHORA" : "ARRANCA EN"} · {nextLabel}</div>
+                      <div className="pm-shine" style={S.finalCountNum}>{countdown}</div>
+                    </div>
+                  )}
+                  <div style={S.finalBannerNote}>🎖️ Clavar el marcador exacto de la <b>FINAL</b> da <b style={{ color: "#ffcd00" }}>+1 punto bonus</b></div>
+                </div>
               </div>
             );
           })()}
@@ -1329,6 +1438,19 @@ function PollaMundial() {
           </div>
           <p style={{ fontSize: 11, opacity: .55, margin: "4px 0 0" }}>El jugador nuevo aparecerá en el popup de inicio y en la tabla. Quitar a alguien no borra lo que ya apostó.</p>
 
+          <h3 style={{ ...S.adminH, marginTop: 24 }}>💌 Mensajes personalizados (recta final)</h3>
+          <p style={{ fontSize: 11.5, opacity: .65, margin: "0 0 10px" }}>Cada quien ve un popup al entrar a la recta final. Si dejas el campo vacío, verá un mensaje automático según su posición. Escribe aquí para personalizarlo.</p>
+          {players.map((p) => (
+            <div key={p} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, width: 82, flexShrink: 0, opacity: .85 }}>{p}</span>
+              <input placeholder="(automático por posición)" value={customMessages[p] || ""}
+                onChange={(e) => { const v = e.target.value; setCustomMessages((cm) => ({ ...cm, [p]: v })); }}
+                onBlur={() => queueSave()}
+                style={{ ...S.adminText, flex: 1 }} />
+            </div>
+          ))}
+          <p style={{ fontSize: 11, opacity: .55, margin: "4px 0 0" }}>💡 Se guarda al salir del campo. Si alguien ya vio su popup, para que vea el nuevo tendría que borrar caché — o lo ve quien aún no ha entrado.</p>
+
           <h3 style={{ ...S.adminH, marginTop: 24 }}>✏️ Editar apuesta de un jugador</h3>
           <p style={{ fontSize: 11.5, opacity: .65, margin: "0 0 10px" }}>Para corregir apuestas (ej. a alguien se le olvidó guardar). Funciona incluso si el partido ya empezó.</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
@@ -1438,13 +1560,24 @@ const S = {
   navBtn: { flex: 1, minWidth: 100, background: "transparent", color: "#8ba0c8", border: "none", padding: "12px", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   navBtnActive: { background: "#ffcd00", color: "#0a1428", boxShadow: "0 4px 14px rgba(212,160,23,.35)" },
   hint: { fontSize: 14, opacity: .7, marginBottom: 20, lineHeight: 1.5 },
-  finalBanner: { background: "linear-gradient(135deg,#1a1207 0%,#2a1c08 40%,#0c1730 100%)", border: "1.5px solid #ffcd00", borderRadius: 18, padding: "20px 22px", marginBottom: 20, textAlign: "center", position: "relative", overflow: "hidden" },
-  finalBannerGlow: { fontSize: 12, fontWeight: 800, color: "#ff6b3d", letterSpacing: 3, marginBottom: 6 },
-  finalBannerTitle: { fontFamily: "'Anton',sans-serif", fontSize: 34, color: "#ffcd00", letterSpacing: 1, lineHeight: 1, textShadow: "0 2px 20px rgba(255,205,0,.4)" },
-  finalCountWrap: { marginTop: 16, marginBottom: 12 },
-  finalCountLbl: { fontSize: 11, opacity: .7, letterSpacing: 1, marginBottom: 4, textTransform: "uppercase" },
-  finalCountNum: { fontFamily: "'Anton',sans-serif", fontSize: 40, lineHeight: 1 },
-  finalBannerNote: { fontSize: 12, opacity: .85, marginTop: 8, paddingTop: 12, borderTop: "1px solid rgba(255,205,0,.2)" },
+
+  wcPattern: { position: "absolute", inset: 0, pointerEvents: "none" },
+  wcInner: { position: "relative", zIndex: 1 },
+  wcTopRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 14 },
+  wcYear: { fontFamily: "'Anton',sans-serif", fontSize: 52, lineHeight: .8, color: "transparent", WebkitTextStroke: "2px #ffcd00", letterSpacing: -2 },
+  wcTopText: { textAlign: "left" },
+  finalBannerGlow: { fontSize: 8.5, fontWeight: 800, color: "#8ba0c8", letterSpacing: 1.5, marginBottom: 4 },
+  finalBannerTitle: { fontFamily: "'Anton',sans-serif", fontSize: 30, color: "#ffcd00", letterSpacing: 1, lineHeight: .95, textShadow: "0 2px 24px rgba(255,205,0,.45)" },
+  wcTrophy: { fontSize: 46, marginTop: 10, filter: "drop-shadow(0 6px 20px rgba(255,205,0,.5))" },
+  finalCountWrap: { marginTop: 8, marginBottom: 14 },
+  finalCountLbl: { fontSize: 10, opacity: .75, letterSpacing: 1.5, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 },
+  finalCountNum: { fontFamily: "'Anton',sans-serif", fontSize: 44, lineHeight: 1, letterSpacing: 1 },
+  finalBannerNote: { fontSize: 12, opacity: .9, marginTop: 6, paddingTop: 14, borderTop: "1px solid rgba(255,205,0,.22)" },
+  popupOverlay: { position: "fixed", inset: 0, background: "rgba(3,7,16,.82)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
+  popupCard: { background: "radial-gradient(120% 130% at 50% 0%, #12224a 0%, #0c1730 55%, #050a12 100%)", border: "1.5px solid #ffcd00", borderRadius: 22, padding: "30px 26px 26px", maxWidth: 380, width: "100%", textAlign: "center", position: "relative", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.6)" },
+  popupTitle: { fontFamily: "'Anton',sans-serif", fontSize: 26, color: "#ffcd00", letterSpacing: .5, lineHeight: 1.05, marginTop: 12, textShadow: "0 2px 20px rgba(255,205,0,.4)" },
+  popupBody: { fontSize: 14.5, lineHeight: 1.6, color: "#dbe4f5", marginTop: 14 },
+  popupBtn: { marginTop: 22, background: "linear-gradient(135deg,#ffe65c,#ffcd00)", color: "#1a1207", border: "none", borderRadius: 12, padding: "13px 30px", fontSize: 15, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", letterSpacing: .5, boxShadow: "0 6px 20px rgba(255,205,0,.35)" },
   groupLabel: { fontFamily: "'Anton', sans-serif", fontSize: 22, color: "#ffcd00", letterSpacing: 1, marginBottom: 10 },
   dateLabel: { fontFamily: "'Anton',sans-serif", fontSize: 18, color: "#ffcd00", letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" },
   row: { display: "flex", alignItems: "center", gap: 8, background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 9, padding: "6px 12px" },
