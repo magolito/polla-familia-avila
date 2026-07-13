@@ -376,6 +376,7 @@ function PollaMundial() {
   const [justSaved, setJustSaved] = useState({}); // flash "✓ Guardado!" momentáneo: { matchId: true }
   const [savingMatch, setSavingMatch] = useState({}); // "Guardando…" mientras confirma: { matchId: true }
   const [expanded, setExpanded] = useState({});    // partidos con apuestas desplegadas: { matchId: true }
+  const [showArchive, setShowArchive] = useState(false); // ver partidos ya jugados (archivo)
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
@@ -1196,7 +1197,10 @@ function PollaMundial() {
         };
         // ¿Hay eliminatorias con resultado o ya empezadas? (para mostrar la sección)
         const koGames = matches.filter((m) => isKO(m.group));
-        const koByRound = KO_ROUNDS.filter((r) => koGames.some((m) => m.group === r)).map((r) => ({
+        // En Apostar mostramos las rondas más avanzadas primero (Final arriba),
+        // para que la gente no tenga que hacer scroll en la recta final.
+        const APOSTAR_ROUND_ORDER = ["Final", "Tercer puesto", "Semifinal", "Cuartos", "Octavos", "Dieciseisavos"];
+        const koByRound = APOSTAR_ROUND_ORDER.filter((r) => koGames.some((m) => m.group === r)).map((r) => ({
           round: r,
           games: koGames.filter((m) => m.group === r).sort((a, b) => (matchTimestamp(a.date) || 0) - (matchTimestamp(b.date) || 0)),
         }));
@@ -1247,27 +1251,75 @@ function PollaMundial() {
             );
           })()}
           <p style={S.hint}>Predice el marcador. <b style={{ color: "#ffcd00" }}>3 pts</b> exacto, <b style={{ color: "#ffcd00" }}>1 pt</b> por acertar quién gana. 🕐 Horas en <b>tu hora local</b>. La apuesta se cierra para todos al arrancar el partido y ahí se revelan todas.</p>
-          {koByRound.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ ...S.dateLabel, color: "#ffcd00", fontSize: 22 }}>⚔️ ELIMINATORIAS</div>
-              <p style={{ fontSize: 12.5, opacity: .65, marginBottom: 16 }}>Marcador de los <b>90 minutos</b> (sin tiempo extra ni penaltis). Los equipos aparecen cuando se definen los cruces.</p>
-              {koByRound.map(({ round, games }) => (
-                <div key={round} style={{ marginBottom: 22 }}>
-                  <div style={S.dateLabel}>{round}</div>
-                  {games.map((m) => BetRow(m))}
-                </div>
-              ))}
-              <div style={{ borderTop: "2px solid #27396b", paddingTop: 20, marginTop: 6, marginBottom: 6 }}>
-                <div style={{ ...S.dateLabel, fontSize: 22 }}>🌎 FASE DE GRUPOS</div>
+          {(() => {
+            // Un partido está "archivado" si ya tiene resultado oficial cargado.
+            const isDone = (m) => { const r = results[m.id]; return r && r.h != null && r.a != null; };
+            // KO activos y archivados
+            const koActive = koByRound.map(({ round, games }) => ({ round, games: games.filter((m) => !isDone(m)) })).filter((x) => x.games.length);
+            const koDone = koByRound.map(({ round, games }) => ({ round, games: games.filter(isDone) })).filter((x) => x.games.length);
+            // Grupos activos y archivados
+            const groupEntries = Object.entries(grouped).filter(([grp]) => !isKO(grp));
+            const grpActive = groupEntries.map(([grp, ms]) => [grp, ms.filter((m) => !isDone(m))]).filter(([, ms]) => ms.length);
+            const grpDone = groupEntries.map(([grp, ms]) => [grp, ms.filter(isDone)]).filter(([, ms]) => ms.length);
+            const archiveCount = koDone.reduce((n, x) => n + x.games.length, 0) + grpDone.reduce((n, x) => n + x[1].length, 0);
+            const sortByTime = (a, b) => (matchTimestamp(a.date) || 0) - (matchTimestamp(b.date) || 0);
+            return (
+              <div>
+                {/* ── ACTIVOS ── */}
+                {koActive.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ ...S.dateLabel, color: "#ffcd00", fontSize: 22 }}>⚔️ ELIMINATORIAS</div>
+                    <p style={{ fontSize: 12.5, opacity: .65, marginBottom: 16 }}>Marcador de los <b>90 minutos</b> (sin tiempo extra ni penaltis). Los equipos aparecen cuando se definen los cruces.</p>
+                    {koActive.map(({ round, games }) => (
+                      <div key={round} style={{ marginBottom: 22 }}>
+                        <div style={S.dateLabel}>{round}</div>
+                        {[...games].sort(sortByTime).map((m) => BetRow(m))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {grpActive.length > 0 && (
+                  <div>
+                    {koActive.length > 0 && <div style={{ borderTop: "2px solid #27396b", paddingTop: 20, marginTop: 6 }}><div style={{ ...S.dateLabel, fontSize: 22 }}>🌎 FASE DE GRUPOS</div></div>}
+                    {grpActive.map(([grp, ms]) => (
+                      <div key={grp} style={{ marginBottom: 22 }}>
+                        <div style={S.dateLabel}>Grupo {grp}</div>
+                        {[...ms].sort(sortByTime).map((m) => BetRow(m))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {koActive.length === 0 && grpActive.length === 0 && (
+                  <p style={{ textAlign: "center", opacity: .6, padding: "24px 0", fontSize: 14 }}>No hay partidos por apostar ahora mismo. 🏆</p>
+                )}
+
+                {/* ── ARCHIVO (partidos ya jugados) ── */}
+                {archiveCount > 0 && (
+                  <div style={{ marginTop: 20, borderTop: "2px solid #1a2a4d", paddingTop: 16 }}>
+                    <button onClick={() => setShowArchive((v) => !v)} style={S.archiveToggle}>
+                      {showArchive ? "▲ Ocultar partidos jugados" : `📁 Ver partidos jugados (${archiveCount})`}
+                    </button>
+                    {showArchive && (
+                      <div style={{ marginTop: 16, opacity: .92 }}>
+                        {koDone.map(({ round, games }) => (
+                          <div key={round} style={{ marginBottom: 22 }}>
+                            <div style={S.dateLabel}>{round}</div>
+                            {[...games].sort(sortByTime).map((m) => BetRow(m))}
+                          </div>
+                        ))}
+                        {grpDone.map(([grp, ms]) => (
+                          <div key={grp} style={{ marginBottom: 22 }}>
+                            <div style={S.dateLabel}>Grupo {grp}</div>
+                            {[...ms].sort(sortByTime).map((m) => BetRow(m))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-          {Object.entries(grouped).filter(([grp]) => !isKO(grp)).map(([grp, ms]) => (
-            <div key={grp} style={{ marginBottom: 22 }}>
-              <div style={S.dateLabel}>Grupo {grp}</div>
-              {[...ms].sort((a, b) => (matchTimestamp(a.date) || 0) - (matchTimestamp(b.date) || 0)).map((m) => BetRow(m))}
-            </div>
-          ))}
+            );
+          })()}
         </div>
         );
       })()}
@@ -1583,6 +1635,7 @@ const S = {
   savedFlash: { color: "#0a1428", background: "#22c55e", borderRadius: 7, padding: "6px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" },
   reveal: { display: "flex", flexWrap: "wrap", gap: 6, padding: "8px 6px 0", justifyContent: "center" },
   revealToggle: { width: "100%", background: "transparent", color: "#8ba0c8", border: "1px solid #1a2a4d", borderRadius: 8, padding: "6px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  archiveToggle: { width: "100%", background: "#0e1a33", color: "#b9c6e2", border: "1px solid #27396b", borderRadius: 10, padding: "12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", letterSpacing: .3 },
   revealItem: { display: "flex", alignItems: "center", gap: 6, fontSize: 11, background: "#0a1228", border: "1px solid #1a2a4d", borderRadius: 8, padding: "4px 9px" },
   mapGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 12 },
   mapNode: { background: "#0e1a33", border: "1px solid #1a2a4d", borderTop: "3px solid #ffcd00", borderRadius: 14, padding: 16, boxShadow: "0 6px 18px rgba(0,0,0,.3)" },
