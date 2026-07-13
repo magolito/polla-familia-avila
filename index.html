@@ -105,7 +105,9 @@ const CHAMPION_PICKS = [
 ];
 const CHAMPION_PTS = 5;
 const FINAL_ID = "m104";        // id de la final
-const FINAL_EXACT_BONUS = 1;    // bonus extra por acertar el marcador EXACTO de la final
+const SEMI_IDS = ["m101", "m102"]; // ids de las semifinales
+const SEMI_EXACT_BONUS = 1;     // bonus por marcador exacto en cada semifinal
+const FINAL_EXACT_BONUS = 2;    // bonus por marcador exacto en la final
 // Cierre de la apuesta de campeón: inicio de las eliminatorias (Ronda de 32).
 // 28 jun 2026, 00:00 hora del Este (UTC-4) = 04:00 UTC.
 const CHAMPION_DEADLINE = Date.UTC(2026, 5, 28, 4, 0);
@@ -728,7 +730,17 @@ function PollaMundial() {
         }
       });
       totals[p].streak = run;
-      // Bono especial: acertar el marcador EXACTO de la final da puntos extra.
+      // Bono por marcador EXACTO en semifinales (+1 cada una) y final (+2).
+      SEMI_IDS.forEach((sid) => {
+        const sr = results[sid];
+        if (sr && sr.h != null && sr.a != null) {
+          const sp = predictions[sid]?.[p];
+          if (sp && sp.h === sr.h && sp.a === sr.a) {
+            totals[p].pts += SEMI_EXACT_BONUS;
+            totals[p].semiBonus = (totals[p].semiBonus || 0) + 1;
+          }
+        }
+      });
       const finalRes = results[FINAL_ID];
       if (finalRes && finalRes.h != null && finalRes.a != null) {
         const fp = predictions[FINAL_ID]?.[p];
@@ -748,7 +760,8 @@ function PollaMundial() {
       if (r.streak >= 3) r.badges.push({ e: "🔥", t: `Racha de ${r.streak}` });
       if (maxStreak >= 3 && r.bestStreak === maxStreak) r.badges.push({ e: "⚡", t: `Mejor racha (${r.bestStreak})` });
       if (r.champ) r.badges.push({ e: "🏆", t: "Acertó el campeón" });
-      if (r.finalBonus) r.badges.push({ e: "🎖️", t: "Clavó el marcador de la final (+1)" });
+      if (r.finalBonus) r.badges.push({ e: "🎖️", t: "Clavó el marcador de la final (+2)" });
+      if (r.semiBonus) r.badges.push({ e: "🥅", t: `Clavó ${r.semiBonus === 2 ? "las 2 semis" : "una semi"} (+${r.semiBonus})` });
     });
     return arr.sort((a, b) => b.pts - a.pts || b.exact - a.exact || b.hits - a.hits);
   }, [matches, predictions, results, champions, realChampion]);
@@ -1241,7 +1254,7 @@ function PollaMundial() {
                       <div className="pm-shine" style={S.finalCountNum}>{countdown}</div>
                     </div>
                   )}
-                  <div style={S.finalBannerNote}>🎖️ Marcador exacto de la <b>FINAL</b> = <b style={{ color: "#ffcd00" }}>+1 bonus</b></div>
+                  <div style={S.finalBannerNote}>🎖️ Marcador exacto: <b style={{ color: "#ffcd00" }}>semis +1</b> · <b style={{ color: "#ffcd00" }}>final +2</b></div>
                 </div>
               </div>
             );
