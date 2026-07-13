@@ -97,6 +97,8 @@ const CHAMPION_PICKS = [
   "Uzbekistán","Sudáfrica","Corea del Sur","Chequia","Bosnia","Ghana","Panamá",
 ];
 const CHAMPION_PTS = 5;
+const FINAL_ID = "m104";        // id de la final
+const FINAL_EXACT_BONUS = 3;    // bonus extra por acertar el marcador EXACTO de la final
 // Cierre de la apuesta de campeón: inicio de las eliminatorias (Ronda de 32).
 // 28 jun 2026, 00:00 hora del Este (UTC-4) = 04:00 UTC.
 const CHAMPION_DEADLINE = Date.UTC(2026, 5, 28, 4, 0);
@@ -365,7 +367,7 @@ function PollaMundial() {
   const [savingMatch, setSavingMatch] = useState({}); // "Guardando…" mientras confirma: { matchId: true }
   const [expanded, setExpanded] = useState({});    // partidos con apuestas desplegadas: { matchId: true }
 
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(t); }, []);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
   // Refs que SIEMPRE tienen el último valor (React actualiza el estado async,
   // así que para guardar usamos estos refs, no las variables de estado).
@@ -715,6 +717,15 @@ function PollaMundial() {
         }
       });
       totals[p].streak = run;
+      // Bono especial: acertar el marcador EXACTO de la final da puntos extra.
+      const finalRes = results[FINAL_ID];
+      if (finalRes && finalRes.h != null && finalRes.a != null) {
+        const fp = predictions[FINAL_ID]?.[p];
+        if (fp && fp.h === finalRes.h && fp.a === finalRes.a) {
+          totals[p].pts += FINAL_EXACT_BONUS;
+          totals[p].finalBonus = true;
+        }
+      }
     });
     if (realChampion) PLAYERS.forEach((p) => { if (champions[p] === realChampion) { totals[p].pts += CHAMPION_PTS; totals[p].champ = true; } });
     const arr = Object.entries(totals).map(([n, v]) => ({ name: n, ...v }));
@@ -726,6 +737,7 @@ function PollaMundial() {
       if (r.streak >= 3) r.badges.push({ e: "🔥", t: `Racha de ${r.streak}` });
       if (maxStreak >= 3 && r.bestStreak === maxStreak) r.badges.push({ e: "⚡", t: `Mejor racha (${r.bestStreak})` });
       if (r.champ) r.badges.push({ e: "🏆", t: "Acertó el campeón" });
+      if (r.finalBonus) r.badges.push({ e: "🎖️", t: "Clavó el marcador de la final (+3)" });
     });
     return arr.sort((a, b) => b.pts - a.pts || b.exact - a.exact || b.hits - a.hits);
   }, [matches, predictions, results, champions, realChampion]);
@@ -1106,6 +1118,42 @@ function PollaMundial() {
         }));
         return (
         <div className="pm-rise">
+          {(() => {
+            // Banner épico para la recta final: aparece cuando solo quedan semis/final.
+            const finalPhase = matches.filter((m) => ["Semifinal", "Final", "Tercer puesto"].includes(m.group));
+            const pending = finalPhase.filter((m) => { const r = results[m.id]; return !(r && r.h != null && r.a != null); });
+            const groupsAllDone = !matches.some((m) => !isKO(m.group) && !(results[m.id]?.h != null));
+            const octQuartDone = !matches.some((m) => ["Octavos", "Cuartos", "Dieciseisavos"].includes(m.group) && !(results[m.id]?.h != null));
+            if (finalPhase.length === 0 || !octQuartDone || pending.length === 0) return null;
+            // Próximo partido de la fase final (con equipos definidos)
+            const next = pending
+              .map((m) => ({ m, ts: matchTimestamp(m.date) }))
+              .filter((x) => x.ts != null)
+              .sort((a, b) => a.ts - b.ts)[0];
+            let countdown = null, nextLabel = "";
+            if (next) {
+              const homeT = resolveSlot(next.m.home), awayT = resolveSlot(next.m.away);
+              nextLabel = `${next.m.group}: ${homeT} vs ${awayT}`;
+              const diff = next.ts - now;
+              if (diff > 0) {
+                const d = Math.floor(diff / 86400000), h = Math.floor((diff % 86400000) / 3600000), mi = Math.floor((diff % 3600000) / 60000), se = Math.floor((diff % 60000) / 1000);
+                countdown = d > 0 ? `${d}d ${h}h ${mi}m` : h > 0 ? `${h}h ${mi}m ${se}s` : `${mi}m ${se}s`;
+              } else countdown = "¡EN JUEGO!";
+            }
+            return (
+              <div className="pm-champ-card" style={S.finalBanner}>
+                <div style={S.finalBannerGlow}>🔥 RECTA FINAL 🔥</div>
+                <div style={S.finalBannerTitle}>{pending.length === 1 && pending[0].group === "Final" ? "¡LA GRAN FINAL!" : "FASE DECISIVA"}</div>
+                {next && countdown && (
+                  <div style={S.finalCountWrap}>
+                    <div style={S.finalCountLbl}>Próximo · {nextLabel}</div>
+                    <div className="pm-shine" style={S.finalCountNum}>{countdown}</div>
+                  </div>
+                )}
+                <div style={S.finalBannerNote}>🎖️ Acertar el marcador exacto de la FINAL da <b style={{ color: "#ffcd00" }}>+3 puntos bonus</b></div>
+              </div>
+            );
+          })()}
           <p style={S.hint}>Predice el marcador. <b style={{ color: "#ffcd00" }}>3 pts</b> exacto, <b style={{ color: "#ffcd00" }}>1 pt</b> por acertar quién gana. 🕐 Horas en <b>tu hora local</b>. La apuesta se cierra para todos al arrancar el partido y ahí se revelan todas.</p>
           {koByRound.length > 0 && (
             <div style={{ marginBottom: 10 }}>
@@ -1390,6 +1438,13 @@ const S = {
   navBtn: { flex: 1, minWidth: 100, background: "transparent", color: "#8ba0c8", border: "none", padding: "12px", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   navBtnActive: { background: "#ffcd00", color: "#0a1428", boxShadow: "0 4px 14px rgba(212,160,23,.35)" },
   hint: { fontSize: 14, opacity: .7, marginBottom: 20, lineHeight: 1.5 },
+  finalBanner: { background: "linear-gradient(135deg,#1a1207 0%,#2a1c08 40%,#0c1730 100%)", border: "1.5px solid #ffcd00", borderRadius: 18, padding: "20px 22px", marginBottom: 20, textAlign: "center", position: "relative", overflow: "hidden" },
+  finalBannerGlow: { fontSize: 12, fontWeight: 800, color: "#ff6b3d", letterSpacing: 3, marginBottom: 6 },
+  finalBannerTitle: { fontFamily: "'Anton',sans-serif", fontSize: 34, color: "#ffcd00", letterSpacing: 1, lineHeight: 1, textShadow: "0 2px 20px rgba(255,205,0,.4)" },
+  finalCountWrap: { marginTop: 16, marginBottom: 12 },
+  finalCountLbl: { fontSize: 11, opacity: .7, letterSpacing: 1, marginBottom: 4, textTransform: "uppercase" },
+  finalCountNum: { fontFamily: "'Anton',sans-serif", fontSize: 40, lineHeight: 1 },
+  finalBannerNote: { fontSize: 12, opacity: .85, marginTop: 8, paddingTop: 12, borderTop: "1px solid rgba(255,205,0,.2)" },
   groupLabel: { fontFamily: "'Anton', sans-serif", fontSize: 22, color: "#ffcd00", letterSpacing: 1, marginBottom: 10 },
   dateLabel: { fontFamily: "'Anton',sans-serif", fontSize: 18, color: "#ffcd00", letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" },
   row: { display: "flex", alignItems: "center", gap: 8, background: "#0e1a33", border: "1px solid #1a2a4d", borderRadius: 9, padding: "6px 12px" },
